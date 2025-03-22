@@ -5,17 +5,39 @@ import asyncio
 from discord.ext import tasks
 import random
 import time
+import json
+from pathlib import Path
 
 # Function to read the bot token from secret.secret
 def read_token():
     with open("secret.secret", "r") as file:
         return file.read().strip()
 
+# Constants
+data_dir = "data"
+prefix_path = f"{data_dir}/prefixes.json"
+default_prefix = "!"
+
+# setup helpers
+async def get_guild_prefix(guid_id: int):
+    try:
+        with open(prefix_path, 'r') as f:
+            prefixes = json.load(f)
+            return prefixes.get(str(guid_id), default_prefix)
+    except (FileNotFoundError, json.decoder.JSONDecodeError):
+        Path(data_dir).mkdir(parents=True, exist_ok=True)
+        with open(prefix_path, 'w') as f:
+            json.dump({}, f)
+        return default_prefix
+
+async def get_prefix(bot, message: discord.Message):
+    prefix = await get_guild_prefix(message.guild.id)
+    return commands.when_mentioned_or(prefix)(bot, message)
 
 # Bot setup
 intents = discord.Intents.default()
 intents.message_content = True
-bot = commands.Bot(command_prefix="!", intents=intents)
+bot = commands.Bot(command_prefix=get_prefix, intents=intents)
 
 # Suppress noise about console usage from youtube_dl
 youtube_dl.utils.bug_reports_message = lambda: ""
@@ -782,6 +804,17 @@ async def playlist(ctx, *, query: str):
         print(f"Playlist error: {e}")
         await processing_msg.edit(content=f"❌ Error processing playlist: {str(e)[:100]}...")
 
+@goon.command(name="setprefix", help="Allows to change the prefix of the bot in the guild")
+@commands.has_permissions(administrator=True)
+async def setprefix(ctx, prefix):
+    with open(prefix_path, 'r') as f:
+        prefixes = json.load(f)
+    current_prefix = prefixes.get(str(ctx.guild.id), default_prefix)
+    prefixes[str(ctx.guild.id)] = prefix
+    with open(prefix_path, 'w') as f:
+        json.dump(prefixes, f, indent=2)
+    await ctx.send(f'Prefix changed from {current_prefix} to {prefix}')
+
 # Add this before bot.run(read_token())
 @bot.event
 async def on_ready():
@@ -790,6 +823,22 @@ async def on_ready():
     bot.add_view(MusicPlayerView())
     # Start the progress update task
     update_progress_bars.start()
+
+@bot.event
+async def on_guild_join(guild):
+    with open(prefix_path, 'r') as f:
+        prefixes = json.load(f)
+    prefixes[str(guild.id)] = default_prefix
+    with open(prefix_path, 'w') as f:
+        json.dump(prefixes, f, indent=2)
+
+@bot.event
+async def on_guild_remove(guild):
+    with open(prefix_path, 'r') as f:
+        prefixes = json.load(f)
+    prefixes.pop(str(guild.id), None)
+    with open(prefix_path, 'w') as f:
+        json.dump(prefixes, f, indent=2)
 
 # Add this event to listen for new messages
 @bot.event
@@ -905,7 +954,6 @@ async def on_voice_state_update(member, before, after):
                 if channel:
                     await channel.send("Everyone left the voice channel, so I disconnected.", delete_after=10)
 
-
 # Add these helper functions to format time and create progress bar
 def format_time(seconds):
     """Convert seconds to MM:SS format"""
@@ -932,7 +980,7 @@ def create_progress_bar(current, total, length=20):
     return bar
 
 # Add a task to update the player periodically
-@tasks.loop(seconds=2)
+@tasks.loop(seconds=1)
 async def update_progress_bars():
     """Update all active players to show current progress"""
     for guild_id, info in list(current_songs.items()):
@@ -948,5 +996,5 @@ async def update_progress_bars():
                 except Exception as e:
                     print(f"Error updating progress bar: {e}")
 
-# Run the bot
-bot.run(read_token())
+if __name__ == '__main__':
+    bot.run(read_token())
