@@ -2,7 +2,6 @@
 
 GoonBot is a Discord music bot that allows users to play music from YouTube directly in their voice channels. It supports commands for joining, leaving, playing, pausing, resuming, stopping, and skipping songs.
 
----
 
 ## Features
 
@@ -17,16 +16,43 @@ GoonBot is a Discord music bot that allows users to play music from YouTube dire
 - **High-Quality Audio**: Uses FFmpeg for high-quality audio streaming
 - **Audio Normalization**: Ensures consistent volume levels across tracks
 
----
 
 ## Prerequisites
 
 - Python 3.8 or higher.
-- discord.py,yt-dlp and pynacl installed using pip.
+- virtualenv (`python -m pip install virtualenv`)
 - FFmpeg installed on your system.
 - A Discord bot token from the [Discord Developer Portal](https://discord.com/developers/applications).
 
----
+
+## Running Locally
+
+### Windows venv setup
+
+```shell
+virtualenv .venv
+.\.venv\Scripts\activate
+```
+
+### Linux/macOs venv setup
+
+```shell
+virtualenv .venv
+source .venv/bin/activate
+```
+
+### Project setup
+
+Create the `secret.secret` file with your bot token.
+
+```shell
+# install development dependencies (also installs production dependencies)
+pip install -r requirements-dev.txt
+
+# launch the bot locally
+python goon.py
+```
+
 
 ## References
 
