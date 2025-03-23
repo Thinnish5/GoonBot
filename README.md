@@ -49,6 +49,8 @@ Create the `secret.secret` file with your bot token.
 # install development dependencies (also installs production dependencies)
 pip install -r requirements-dev.txt
 
+black --line-length 160 .
+
 # launch the bot locally
 python goon.py
 ```
