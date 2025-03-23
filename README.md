@@ -19,22 +19,15 @@ GoonBot is a Discord music bot that allows users to play music from YouTube dire
 
 ## Prerequisites
 
-- Python 3.8 or higher.
-- virtualenv (`python -m pip install virtualenv`)
+- Python (with pip) 3.9 or higher (3.13 is recomended)
+- virtualenv (`python3 -m pip install virtualenv`)
 - FFmpeg installed on your system.
 - A Discord bot token from the [Discord Developer Portal](https://discord.com/developers/applications).
 
 
 ## Running Locally
 
-### Windows venv setup
-
-```shell
-virtualenv .venv
-.\.venv\Scripts\activate
-```
-
-### Linux/macOs venv setup
+Create the `secret.secret` file with your bot token.
 
 ```shell
 virtualenv .venv
@@ -49,10 +42,15 @@ Create the `secret.secret` file with your bot token.
 # install development dependencies (also installs production dependencies)
 pip install -r requirements-dev.txt
 
-# launch the bot locally
-python goon.py
+python3 goon.py
 ```
 
+### Git Hooks
+
+You can install the git hooks present in the `.githook` files so that they automatically run.
+```shell
+git config --local core.hooksPath .githooks
+```
 
 ## References
 
@@ -69,7 +67,6 @@ python goon.py
 - [YouTube Terms of Service](https://www.youtube.com/t/terms)
 - [Discord.py Voice Examples](https://github.com/Rapptz/discord.py/blob/master/examples/basic_voice.py)
 
----
 
 ## License
 This project is licensed under the MIT License. See the [LICENSE](https://github.com/Thinnish5/goonbot/blob/main/LICENSE) file for details.
