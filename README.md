@@ -27,8 +27,6 @@ GoonBot is a Discord music bot that allows users to play music from YouTube dire
 
 ## Running Locally
 
-### Linux/macOs venv setup
-
 Create the `secret.secret` file with your bot token.
 
 ```shell
