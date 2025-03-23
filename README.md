@@ -39,8 +39,6 @@ source .venv/bin/activate
 # install bot dependencies
 pip install -r requirements.txt
 
-black --line-length 160 .
-
 # launch the bot locally
 python goon.py
 ```

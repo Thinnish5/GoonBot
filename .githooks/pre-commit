@@ -1,20 +1,23 @@
-#!/bin/bash -e
+#!/bin/bash
+
+echo "Running git pre-commit hook..."
 
 # virtual environment to isolate the dependencies
-virtualenv --quiet .venv
+if [ ! -d ".venv" ]; then
+    virtualenv --quiet .venv
+fi
 source .venv/bin/activate
 
 # install development dependencies
 pip install --quiet -r requirements-dev.txt
 
 # run formatter and add files to commit
-#black --line-length 160 .
-#git add --update
-
+# run linter for information
 staged_files=$(git diff --staged --name-only)
-echo $staged_files
 for file in $staged_files; do 
     if [[ $file == *.py ]]; then
+        black --line-length 160 $file
         pylint --max-line-length 160 $file
+        git add --update
     fi
 done
