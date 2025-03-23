@@ -1,0 +1,7 @@
+#!/bin/bash -e
+virtualenv --quiet .venv
+source .venv/bin/activate
+
+pip install --quiet -r requirements-dev.txt
+
+#black --line-length 160 .
