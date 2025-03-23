@@ -27,32 +27,28 @@ GoonBot is a Discord music bot that allows users to play music from YouTube dire
 
 ## Running Locally
 
-### Windows venv setup
-
-```shell
-virtualenv .venv
-.\.venv\Scripts\activate
-```
-
 ### Linux/macOs venv setup
-
-```shell
-virtualenv .venv
-source .venv/bin/activate
-```
-
-### Project setup
 
 Create the `secret.secret` file with your bot token.
 
 ```shell
-# install development dependencies (also installs production dependencies)
-pip install -r requirements-dev.txt
+# virtual environment to isolate the dependencies
+virtualenv .venv
+source .venv/bin/activate
+
+# install bot dependencies
+pip install -r requirements.txt
 
 # launch the bot locally
 python goon.py
 ```
 
+## Git Hooks
+
+To configure the git hooks run:
+```shell
+git config --local core.hooksPath .githooks
+```
 
 ## References
 

@@ -1,7 +1,20 @@
 #!/bin/bash -e
+
+# virtual environment to isolate the dependencies
 virtualenv --quiet .venv
 source .venv/bin/activate
 
+# install development dependencies
 pip install --quiet -r requirements-dev.txt
 
+# run formatter and add files to commit
 #black --line-length 160 .
+#git add --update
+
+staged_files=$(git diff --staged --name-only)
+echo $staged_files
+for file in $staged_files; do 
+    if [[ $file == *.py ]]; then
+        pylint --max-line-length 160 $file
+    fi
+done
