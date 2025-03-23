@@ -17,6 +17,7 @@ def read_token():
 data_dir = "data"
 prefix_path = f"{data_dir}/prefixes.json"
 default_prefix = "!"
+build_date = "2025-03-23"
 
 # setup helpers
 async def get_guild_prefix(guid_id: int):
@@ -452,6 +453,9 @@ async def goon(ctx, *, query: str = None):
     except:
         pass
 
+@goon.command(name="info", help="Shows information about the bot")
+async def info(ctx):
+    await ctx.send(f"Build date: {build_date}")
 
 # Command: !goon search <query>
 @goon.command(
