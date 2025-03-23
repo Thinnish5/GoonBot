@@ -2,6 +2,17 @@
 
 echo "Running git pre-commit hook..."
 
+# Get all staged files
+staged_files=$(git diff --staged --name-only)
+
+# Filter for Python files only
+python_files=$(echo "$staged_files" | grep "\.py$" || true)
+
+# Early return if no Python files are found
+if [ -z "$python_files" ]; then
+    exit 0  # Exit successfully since this is not an error
+fi
+
 # virtual environment to isolate the dependencies
 if [ ! -d ".venv" ]; then
     virtualenv --quiet .venv
@@ -11,13 +22,17 @@ source .venv/bin/activate
 # install development dependencies
 pip install --quiet -r requirements-dev.txt
 
-# run formatter and add files to commit
-# run linter for information
-staged_files=$(git diff --staged --name-only)
-for file in $staged_files; do 
-    if [[ $file == *.py ]]; then
-        black --line-length 160 $file
-        pylint --max-line-length 160 $file
-        git add --update
-    fi
-done
+# Apply Black formatter to all Python files at once
+echo "Running formatter on modified files..."
+echo "$python_files" | xargs black --line-length 160
+
+# Run Pylint on all Python files at once
+echo "Running linter on modified files..."
+echo "$python_files" | xargs pylint --max-line-length 160
+
+# Run Pyre checker
+echo "Running type checker on complete project..."
+pyre check
+
+# Stage the modified files
+git add --update
