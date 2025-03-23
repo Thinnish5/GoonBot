@@ -72,7 +72,7 @@ ytdl_format_options = {
 # Update FFmpeg options for better reliability
 ffmpeg_options = {
     "options": "-vn -b:a 192k -af loudnorm",
-    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 10 -nostdin -analyzeduration 2000000 -probesize 1000000 -bufsize 3000k",
+    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 10 -nostdin -analyzeduration 2000000 -probesize 1000000",
 }
 
 ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
