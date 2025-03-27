@@ -1,5 +1,9 @@
-build_date = "2025-03-27"
-data_dir = "data"
-default_prefix = "!"
-prefix_path = f"{data_dir}/prefixes.json"
-secret_file = "secret.secret"
+"""
+Holds all the global constants used in the project.
+"""
+
+BUILD_DATE = "2025-03-27"
+DATA_DIR = "data"
+DEFAULT_PREFIX = "!"
+PREFIX_PATH = f"{DATA_DIR}/prefixes.json"
+SECRET_FILE = "secret.secret"

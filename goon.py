@@ -1,37 +1,37 @@
-# python modules
+# 1st party modules
 import asyncio
 import json
 from pathlib import Path
 import random
 import time
 
-# python packages
+# 3rd party modules
 import discord
 from discord.ext import commands
 from discord.ext import tasks
 import yt_dlp as youtube_dl
 
-# project files
+# internal modules
 from globals import *
 
 
 # Function to read the bot token from secret.secret
 def read_token():
-    with open(secret_file, "r") as file:
+    with open(SECRET_FILE, "r") as file:
         return file.read().strip()
 
 
 # setup helpers
 async def get_guild_prefix(guid_id: int):
     try:
-        with open(prefix_path, "r") as f:
+        with open(PREFIX_PATH, "r") as f:
             prefixes = json.load(f)
-            return prefixes.get(str(guid_id), default_prefix)
+            return prefixes.get(str(guid_id), DEFAULT_PREFIX)
     except (FileNotFoundError, json.decoder.JSONDecodeError):
-        Path(data_dir).mkdir(parents=True, exist_ok=True)
-        with open(prefix_path, "w") as f:
+        Path(DATA_DIR).mkdir(parents=True, exist_ok=True)
+        with open(PREFIX_PATH, "w") as f:
             json.dump({}, f)
-        return default_prefix
+        return DEFAULT_PREFIX
 
 
 async def get_prefix(bot, message: discord.Message):
@@ -457,7 +457,7 @@ async def goon(ctx, *, query: str = None):
 
 @goon.command(name="info", help="Shows information about the bot")
 async def info(ctx):
-    await ctx.send(f"Build date: {build_date}")
+    await ctx.send(f"Build date: {BUILD_DATE}")
 
 
 # Command: !goon search <query>
@@ -812,11 +812,11 @@ async def playlist(ctx, *, query: str):
 @goon.command(name="setprefix", help="Allows to change the prefix of the bot in the guild")
 @commands.has_permissions(administrator=True)
 async def setprefix(ctx, prefix):
-    with open(prefix_path, "r") as f:
+    with open(PREFIX_PATH, "r") as f:
         prefixes = json.load(f)
-    current_prefix = prefixes.get(str(ctx.guild.id), default_prefix)
+    current_prefix = prefixes.get(str(ctx.guild.id), DEFAULT_PREFIX)
     prefixes[str(ctx.guild.id)] = prefix
-    with open(prefix_path, "w") as f:
+    with open(PREFIX_PATH, "w") as f:
         json.dump(prefixes, f, indent=2)
     await ctx.send(f"Prefix changed from {current_prefix} to {prefix}")
 
@@ -833,19 +833,19 @@ async def on_ready():
 
 @bot.event
 async def on_guild_join(guild):
-    with open(prefix_path, "r") as f:
+    with open(PREFIX_PATH, "r") as f:
         prefixes = json.load(f)
-    prefixes[str(guild.id)] = default_prefix
-    with open(prefix_path, "w") as f:
+    prefixes[str(guild.id)] = DEFAULT_PREFIX
+    with open(PREFIX_PATH, "w") as f:
         json.dump(prefixes, f, indent=2)
 
 
 @bot.event
 async def on_guild_remove(guild):
-    with open(prefix_path, "r") as f:
+    with open(PREFIX_PATH, "r") as f:
         prefixes = json.load(f)
     prefixes.pop(str(guild.id), None)
-    with open(prefix_path, "w") as f:
+    with open(PREFIX_PATH, "w") as f:
         json.dump(prefixes, f, indent=2)
 
 
