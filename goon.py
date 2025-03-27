@@ -11,18 +11,14 @@ from discord.ext import commands
 from discord.ext import tasks
 import yt_dlp as youtube_dl
 
+# project files
+from globals import *
+
 
 # Function to read the bot token from secret.secret
 def read_token():
-    with open("secret.secret", "r") as file:
+    with open(secret_file, "r") as file:
         return file.read().strip()
-
-
-# Constants
-data_dir = "data"
-prefix_path = f"{data_dir}/prefixes.json"
-default_prefix = "!"
-build_date = "2025-03-23"
 
 
 # setup helpers

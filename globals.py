@@ -1,0 +1,5 @@
+build_date = "2025-03-27"
+data_dir = "data"
+default_prefix = "!"
+prefix_path = f"{data_dir}/prefixes.json"
+secret_file = "secret.secret"
