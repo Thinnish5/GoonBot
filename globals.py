@@ -1,5 +1,5 @@
 """
-Holds all the global constants used in the project.
+Holds all the global constants used in the project
 """
 
 BUILD_DATE = "2025-03-27"

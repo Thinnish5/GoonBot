@@ -9,9 +9,9 @@ import time
 import discord
 from discord.ext import commands
 from discord.ext import tasks
-import yt_dlp as youtube_dl
 
 # internal modules
+from downloader import YTDLSource, playlist_ytdl, ytdl
 from globals import *  # pylint: disable=wildcard-import
 
 
@@ -43,39 +43,6 @@ async def get_prefix(bot, message: discord.Message):
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix=get_prefix, intents=intents)
-
-# Suppress noise about console usage from youtube_dl
-youtube_dl.utils.bug_reports_message = lambda: ""
-
-# Update these options to use more reliable formats
-ytdl_format_options = {
-    # Prefer more stable formats
-    "format": "bestaudio[ext=m4a]/bestaudio/best",
-    "outtmpl": "%(extractor)s-%(id)s-%(title)s.%(ext)s",
-    "restrictfilenames": True,
-    "noplaylist": True,
-    "nocheckcertificate": True,
-    "ignoreerrors": False,
-    "logtostderr": False,
-    "quiet": True,
-    "no_warnings": True,
-    "default_search": "auto",
-    "source_address": "0.0.0.0",
-    "extract_flat": True,
-    "prefer_ffmpeg": True,
-    "cachedir": False,  # Prevent stale URL caching
-    "http_headers": {  # More realistic browser headers
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-    },
-}
-
-# Update FFmpeg options for better reliability
-ffmpeg_options = {
-    "options": "-vn -b:a 192k -af loudnorm",
-    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 10 -nostdin -analyzeduration 2000000 -probesize 1000000",
-}
-
-ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
 
 # Queue system
 queue = []
@@ -257,50 +224,6 @@ async def update_player(ctx, song_title=None, is_playing=False):
     player_messages[guild_id] = message
 
 
-# Improved YouTube DL extractor with retry mechanism
-class YTDLSource(discord.PCMVolumeTransformer):
-    def __init__(self, source, *, data, volume=0.5):
-        super().__init__(source, volume)
-        self.data = data
-        self.title = data.get("title", "Unknown title")
-        self.url = data.get("url", "")
-
-    @classmethod
-    async def from_url(cls, url, *, loop=None, stream=False):
-        loop = loop or asyncio.get_event_loop()
-
-        # Try multiple times with different formats if needed
-        for attempt in range(3):
-            try:
-                # Wait between retries
-                if attempt > 0:
-                    await asyncio.sleep(1)
-                    print(f"Retry attempt {attempt} for {url}")
-
-                # Create a fresh YTDL instance for each attempt
-                ytdl_instance = youtube_dl.YoutubeDL(ytdl_format_options)
-
-                # Extract info
-                data = await loop.run_in_executor(None, lambda: ytdl_instance.extract_info(url, download=not stream))
-
-                if "entries" in data:
-                    # Get the first item if it's a playlist
-                    data = data["entries"][0]
-
-                if not data:
-                    continue
-
-                filename = data["url"] if stream else ytdl_instance.prepare_filename(data)
-                return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
-
-            except Exception as e:
-                print(f"Stream extraction attempt {attempt+1} failed: {e}")
-                if attempt == 2:  # Last attempt failed
-                    raise
-
-        raise Exception("All extraction attempts failed")
-
-
 # Add this helper function to clean up previous player messages
 async def cleanup_previous_player_messages(ctx):
     """Find and delete old player messages from the bot in the current channel"""
@@ -407,9 +330,8 @@ async def goon(ctx, *, query: str = None):
         voice_client = await channel.connect()
 
     # Check if the query is a URL or a search term
-    is_url = "youtube.com" in query or "youtu.be" in query
-
-    if is_url:
+    youtube_domains = ["youtube.com", "youtu.be"]
+    if query.lower() in youtube_domains:
         # Existing behavior for URLs
         actual_query = query
         temp_msg = await ctx.send(f"Added to queue: `{query}`")
@@ -733,18 +655,6 @@ async def playlist(ctx, *, query: str):
 
     # Let the user know we're processing the playlist
     processing_msg = await ctx.send("⏳ Processing playlist... This may take a moment.")
-
-    # Create a custom ytdl instance with playlist-specific options
-    playlist_ytdl_options = ytdl_format_options.copy()
-    playlist_ytdl_options.update(
-        {
-            "extract_flat": "in_playlist",  # Better playlist extraction
-            "ignoreerrors": True,  # Skip failed entries
-            "playlistend": 50,  # Limit to 50 items to avoid overloading
-            "noplaylist": False,  # Allow playlist processing
-        }
-    )
-    playlist_ytdl = youtube_dl.YoutubeDL(playlist_ytdl_options)
 
     # Fetch the playlist items
     try:
