@@ -7,13 +7,12 @@ import asyncio
 from typing import Any, Dict, Self
 
 # 3rd party modules
-from discord import AudioSource, FFmpegPCMAudio, PCMVolumeTransformer
+from discord.player import AT
+from discord import FFmpegPCMAudio, PCMVolumeTransformer
 import yt_dlp
 
-ffmpeg_options = {
-    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 10 -nostdin -analyzeduration 2000000 -probesize 1000000",
-    "options": "-vn -b:a 192k -af loudnorm",
-}
+ffmpeg_before_options = "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 10 -nostdin -analyzeduration 2000000 -probesize 1000000"
+ffmpeg_options = "-vn -b:a 192k -af loudnorm"
 
 ytdl_format_options = {
     # Prefer more stable formats
@@ -57,7 +56,7 @@ playlist_ytdl = yt_dlp.YoutubeDL(playlist_ytdl_options)
 class YTDLSource(PCMVolumeTransformer):
     """Improved YouTube DL extractor with retry mechanism"""
 
-    def __init__(self, source: AudioSource, *, data: Dict[str, Any], volume: float = 0.5) -> None:
+    def __init__(self, source: AT, *, data: Dict[str, Any], volume: float = 0.5) -> None:
         super().__init__(source, volume)
         self.data: Dict[str, Any] = data
         self.title: str = data.get("title", "Unknown title")
@@ -91,7 +90,7 @@ class YTDLSource(PCMVolumeTransformer):
                     continue
 
                 filename = data["url"] if stream else ytdl_instance.prepare_filename(data)
-                return cls(FFmpegPCMAudio(source=filename, **ffmpeg_options), data=data)
+                return cls(FFmpegPCMAudio(source=filename, before_options=ffmpeg_before_options, options=ffmpeg_options), data=data)
 
             except Exception as e:
                 print(f"Stream extraction attempt {attempt + 1} failed: {e}")
