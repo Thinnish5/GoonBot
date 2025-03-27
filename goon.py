@@ -17,19 +17,19 @@ from globals import *
 
 # Function to read the bot token from secret.secret
 def read_token():
-    with open(SECRET_FILE, "r") as file:
+    with open(file=SECRET_FILE, mode="r", encoding="utf8") as file:
         return file.read().strip()
 
 
 # setup helpers
 async def get_guild_prefix(guid_id: int):
     try:
-        with open(PREFIX_PATH, "r") as f:
+        with open(file=PREFIX_PATH, mode="r", encoding="utf8") as f:
             prefixes = json.load(f)
             return prefixes.get(str(guid_id), DEFAULT_PREFIX)
     except (FileNotFoundError, json.decoder.JSONDecodeError):
         Path(DATA_DIR).mkdir(parents=True, exist_ok=True)
-        with open(PREFIX_PATH, "w") as f:
+        with open(file=PREFIX_PATH, mode="w", encoding="utf8") as f:
             json.dump({}, f)
         return DEFAULT_PREFIX
 
@@ -812,11 +812,11 @@ async def playlist(ctx, *, query: str):
 @goon.command(name="setprefix", help="Allows to change the prefix of the bot in the guild")
 @commands.has_permissions(administrator=True)
 async def setprefix(ctx, prefix):
-    with open(PREFIX_PATH, "r") as f:
+    with open(file=PREFIX_PATH, mode="r", encoding="utf8") as f:
         prefixes = json.load(f)
     current_prefix = prefixes.get(str(ctx.guild.id), DEFAULT_PREFIX)
     prefixes[str(ctx.guild.id)] = prefix
-    with open(PREFIX_PATH, "w") as f:
+    with open(file=PREFIX_PATH, mode="w", encoding="utf8") as f:
         json.dump(prefixes, f, indent=2)
     await ctx.send(f"Prefix changed from {current_prefix} to {prefix}")
 
@@ -833,19 +833,19 @@ async def on_ready():
 
 @bot.event
 async def on_guild_join(guild):
-    with open(PREFIX_PATH, "r") as f:
+    with open(file=PREFIX_PATH, mode="r", encoding="utf8") as f:
         prefixes = json.load(f)
     prefixes[str(guild.id)] = DEFAULT_PREFIX
-    with open(PREFIX_PATH, "w") as f:
+    with open(file=PREFIX_PATH, mode="w", encoding="utf8") as f:
         json.dump(prefixes, f, indent=2)
 
 
 @bot.event
 async def on_guild_remove(guild):
-    with open(PREFIX_PATH, "r") as f:
+    with open(file=PREFIX_PATH, mode="r", encoding="utf8") as f:
         prefixes = json.load(f)
     prefixes.pop(str(guild.id), None)
-    with open(PREFIX_PATH, "w") as f:
+    with open(file=PREFIX_PATH, mode="w", encoding="utf8") as f:
         json.dump(prefixes, f, indent=2)
 
 
