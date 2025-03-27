@@ -11,8 +11,8 @@ from discord.player import AT
 from discord import FFmpegPCMAudio, PCMVolumeTransformer
 import yt_dlp
 
-ffmpeg_before_options = "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 10 -nostdin -analyzeduration 2000000 -probesize 1000000"
-ffmpeg_options = "-vn -b:a 192k -af loudnorm"
+FFMPEG_BEFORE_OPTIONS = "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 10 -nostdin -analyzeduration 2000000 -probesize 1000000"
+FFMPEG_OPTIONS = "-vn -b:a 192k -af loudnorm"
 
 ytdl_format_options = {
     # Prefer more stable formats
@@ -90,7 +90,7 @@ class YTDLSource(PCMVolumeTransformer):
                     continue
 
                 filename = data["url"] if stream else ytdl_instance.prepare_filename(data)
-                return cls(FFmpegPCMAudio(source=filename, before_options=ffmpeg_before_options, options=ffmpeg_options), data=data)
+                return cls(FFmpegPCMAudio(source=filename, before_options=FFMPEG_BEFORE_OPTIONS, options=FFMPEG_OPTIONS), data=data)
 
             except Exception as e:
                 print(f"Stream extraction attempt {attempt + 1} failed: {e}")
