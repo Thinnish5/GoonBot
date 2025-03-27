@@ -12,7 +12,7 @@ from discord.ext import tasks
 import yt_dlp as youtube_dl
 
 # internal modules
-from globals import *
+from globals import *  # pylint: disable=wildcard-import
 
 
 # Function to read the bot token from secret.secret
@@ -372,7 +372,7 @@ async def play_next(ctx):
         except Exception as e:
             print(f"Error playing {query}: {e}")
             queue.pop(0)
-            await ctx.send(f"❌ Error playing song. Skipping to next...", delete_after=5)
+            await ctx.send("❌ Error playing song. Skipping to next...", delete_after=5)
             await asyncio.sleep(1)
             await play_next(ctx)
     else:
@@ -660,7 +660,7 @@ async def stop(ctx):
 
 
 @goon.command(name="help", help="Displays the help message")
-async def help(ctx):
+async def bot_help(ctx):
     await ctx.send(
         "GoonBot is a music bot that can play songs from YouTube. Usage:\n"
         "1. `!goon <query>`: Plays the song with the given query.\n"
@@ -963,12 +963,12 @@ async def on_voice_state_update(member, before, after):
 
 
 # Add these helper functions to format time and create progress bar
-def format_time(seconds):
+def format_time(seconds: float):
     """Convert seconds to MM:SS format"""
     if seconds is None:
-        return "0:00"
+        return "00:00"
     minutes, seconds = divmod(int(seconds), 60)
-    return f"{minutes}:{seconds:02d}"
+    return f"{minutes:02d}:{seconds:02d}"
 
 
 def create_progress_bar(current, total, length=20):
@@ -984,9 +984,9 @@ def create_progress_bar(current, total, length=20):
     empty = "┈" * (length - position - 1)
 
     # Create bar with playhead
-    bar = filled + "⚪" + empty
+    progress_bar = filled + "⚪" + empty
 
-    return bar
+    return progress_bar
 
 
 # Add a task to update the player periodically
