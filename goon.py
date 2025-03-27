@@ -258,7 +258,7 @@ async def play_next(ctx):
     if len(queue) > 0:
         query = queue[0]
         try:
-            player = await YTDLSource.from_url(query, loop=bot.loop, stream=True)
+            player: YTDLSource = await YTDLSource.from_url(url=query, loop=bot.loop, stream=True)
             queue.pop(0)
 
             # Extract thumbnail URL from the data
