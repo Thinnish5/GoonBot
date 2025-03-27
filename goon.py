@@ -1,12 +1,15 @@
-import discord
-from discord.ext import commands
-import yt_dlp as youtube_dl
+# python modules
 import asyncio
-from discord.ext import tasks
-import random
-import time
 import json
 from pathlib import Path
+import random
+import time
+
+# python packages
+import discord
+from discord.ext import commands
+from discord.ext import tasks
+import yt_dlp as youtube_dl
 
 
 # Function to read the bot token from secret.secret
@@ -50,7 +53,8 @@ youtube_dl.utils.bug_reports_message = lambda: ""
 
 # Update these options to use more reliable formats
 ytdl_format_options = {
-    "format": "bestaudio[ext=m4a]/bestaudio/best",  # Prefer more stable formats
+    # Prefer more stable formats
+    "format": "bestaudio[ext=m4a]/bestaudio/best",
     "outtmpl": "%(extractor)s-%(id)s-%(title)s.%(ext)s",
     "restrictfilenames": True,
     "noplaylist": True,
