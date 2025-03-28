@@ -11,7 +11,7 @@ from discord import AudioSource, FFmpegPCMAudio, PCMVolumeTransformer
 import yt_dlp
 
 # internal modules
-from globals import *  # pylint: disable=wildcard-import
+from globals import FFMPEG_BEFORE_OPTIONS, FFMPEG_OPTIONS
 
 ytdl_format_options = {
     # Prefer more stable formats

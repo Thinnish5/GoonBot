@@ -18,7 +18,7 @@ from discord.ext import tasks
 
 # internal modules
 from downloader import YTDLSource, playlist_ytdl, ytdl
-from globals import *  # pylint: disable=wildcard-import
+from globals import BUILD_DATE, DATA_DIR, DEFAULT_PREFIX, PREFIX_PATH, SECRET_FILE
 
 
 # Function to read the bot token from secret.secret
