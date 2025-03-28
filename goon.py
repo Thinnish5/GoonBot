@@ -1,38 +1,43 @@
-import discord
-from discord.ext import commands
-import yt_dlp as youtube_dl
+"""
+Main module for the GoonBot.
+GoonBot is a Discord music bot that allows users to play music from YouTube directly in their voice channels.
+It supports commands for joining, leaving, playing, pausing, resuming, stopping, and skipping songs.
+"""
+
+# 1st party modules
 import asyncio
-from discord.ext import tasks
-import random
-import time
 import json
 from pathlib import Path
+import random
+import time
+
+# 3rd party modules
+import discord
+from discord.ext import commands
+from discord.ext import tasks
+
+# internal modules
+from downloader import YTDLSource, playlist_ytdl, ytdl
+from globals import BUILD_DATE, DATA_DIR, DEFAULT_PREFIX, PREFIX_PATH, SECRET_FILE
 
 
 # Function to read the bot token from secret.secret
 def read_token():
-    with open("secret.secret", "r") as file:
+    with open(file=SECRET_FILE, mode="r", encoding="utf8") as file:
         return file.read().strip()
-
-
-# Constants
-data_dir = "data"
-prefix_path = f"{data_dir}/prefixes.json"
-default_prefix = "!"
-build_date = "2025-03-23"
 
 
 # setup helpers
 async def get_guild_prefix(guid_id: int):
     try:
-        with open(prefix_path, "r") as f:
+        with open(file=PREFIX_PATH, mode="r", encoding="utf8") as f:
             prefixes = json.load(f)
-            return prefixes.get(str(guid_id), default_prefix)
+            return prefixes.get(str(guid_id), DEFAULT_PREFIX)
     except (FileNotFoundError, json.decoder.JSONDecodeError):
-        Path(data_dir).mkdir(parents=True, exist_ok=True)
-        with open(prefix_path, "w") as f:
+        Path(DATA_DIR).mkdir(parents=True, exist_ok=True)
+        with open(file=PREFIX_PATH, mode="w", encoding="utf8") as f:
             json.dump({}, f)
-        return default_prefix
+        return DEFAULT_PREFIX
 
 
 async def get_prefix(bot, message: discord.Message):
@@ -44,38 +49,6 @@ async def get_prefix(bot, message: discord.Message):
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix=get_prefix, intents=intents)
-
-# Suppress noise about console usage from youtube_dl
-youtube_dl.utils.bug_reports_message = lambda: ""
-
-# Update these options to use more reliable formats
-ytdl_format_options = {
-    "format": "bestaudio[ext=m4a]/bestaudio/best",  # Prefer more stable formats
-    "outtmpl": "%(extractor)s-%(id)s-%(title)s.%(ext)s",
-    "restrictfilenames": True,
-    "noplaylist": True,
-    "nocheckcertificate": True,
-    "ignoreerrors": False,
-    "logtostderr": False,
-    "quiet": True,
-    "no_warnings": True,
-    "default_search": "auto",
-    "source_address": "0.0.0.0",
-    "extract_flat": True,
-    "prefer_ffmpeg": True,
-    "cachedir": False,  # Prevent stale URL caching
-    "http_headers": {  # More realistic browser headers
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-    },
-}
-
-# Update FFmpeg options for better reliability
-ffmpeg_options = {
-    "options": "-vn -b:a 192k -af loudnorm",
-    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 10 -nostdin -analyzeduration 2000000 -probesize 1000000",
-}
-
-ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
 
 # Queue system
 queue = []
@@ -257,50 +230,6 @@ async def update_player(ctx, song_title=None, is_playing=False):
     player_messages[guild_id] = message
 
 
-# Improved YouTube DL extractor with retry mechanism
-class YTDLSource(discord.PCMVolumeTransformer):
-    def __init__(self, source, *, data, volume=0.5):
-        super().__init__(source, volume)
-        self.data = data
-        self.title = data.get("title", "Unknown title")
-        self.url = data.get("url", "")
-
-    @classmethod
-    async def from_url(cls, url, *, loop=None, stream=False):
-        loop = loop or asyncio.get_event_loop()
-
-        # Try multiple times with different formats if needed
-        for attempt in range(3):
-            try:
-                # Wait between retries
-                if attempt > 0:
-                    await asyncio.sleep(1)
-                    print(f"Retry attempt {attempt} for {url}")
-
-                # Create a fresh YTDL instance for each attempt
-                ytdl_instance = youtube_dl.YoutubeDL(ytdl_format_options)
-
-                # Extract info
-                data = await loop.run_in_executor(None, lambda: ytdl_instance.extract_info(url, download=not stream))
-
-                if "entries" in data:
-                    # Get the first item if it's a playlist
-                    data = data["entries"][0]
-
-                if not data:
-                    continue
-
-                filename = data["url"] if stream else ytdl_instance.prepare_filename(data)
-                return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
-
-            except Exception as e:
-                print(f"Stream extraction attempt {attempt+1} failed: {e}")
-                if attempt == 2:  # Last attempt failed
-                    raise
-
-        raise Exception("All extraction attempts failed")
-
-
 # Add this helper function to clean up previous player messages
 async def cleanup_previous_player_messages(ctx):
     """Find and delete old player messages from the bot in the current channel"""
@@ -335,7 +264,7 @@ async def play_next(ctx):
     if len(queue) > 0:
         query = queue[0]
         try:
-            player = await YTDLSource.from_url(query, loop=bot.loop, stream=True)
+            player: YTDLSource = await YTDLSource.from_url(url=query, loop=bot.loop, stream=True)
             queue.pop(0)
 
             # Extract thumbnail URL from the data
@@ -372,7 +301,7 @@ async def play_next(ctx):
         except Exception as e:
             print(f"Error playing {query}: {e}")
             queue.pop(0)
-            await ctx.send(f"❌ Error playing song. Skipping to next...", delete_after=5)
+            await ctx.send("❌ Error playing song. Skipping to next...", delete_after=5)
             await asyncio.sleep(1)
             await play_next(ctx)
     else:
@@ -407,9 +336,8 @@ async def goon(ctx, *, query: str = None):
         voice_client = await channel.connect()
 
     # Check if the query is a URL or a search term
-    is_url = "youtube.com" in query or "youtu.be" in query
-
-    if is_url:
+    youtube_domains = ["youtube.com", "youtu.be"]
+    if query.lower() in youtube_domains:
         # Existing behavior for URLs
         actual_query = query
         temp_msg = await ctx.send(f"Added to queue: `{query}`")
@@ -457,7 +385,7 @@ async def goon(ctx, *, query: str = None):
 
 @goon.command(name="info", help="Shows information about the bot")
 async def info(ctx):
-    await ctx.send(f"Build date: {build_date}")
+    await ctx.send(f"Build date: {BUILD_DATE}")
 
 
 # Command: !goon search <query>
@@ -660,7 +588,7 @@ async def stop(ctx):
 
 
 @goon.command(name="help", help="Displays the help message")
-async def help(ctx):
+async def bot_help(ctx):
     await ctx.send(
         "GoonBot is a music bot that can play songs from YouTube. Usage:\n"
         "1. `!goon <query>`: Plays the song with the given query.\n"
@@ -734,18 +662,6 @@ async def playlist(ctx, *, query: str):
     # Let the user know we're processing the playlist
     processing_msg = await ctx.send("⏳ Processing playlist... This may take a moment.")
 
-    # Create a custom ytdl instance with playlist-specific options
-    playlist_ytdl_options = ytdl_format_options.copy()
-    playlist_ytdl_options.update(
-        {
-            "extract_flat": "in_playlist",  # Better playlist extraction
-            "ignoreerrors": True,  # Skip failed entries
-            "playlistend": 50,  # Limit to 50 items to avoid overloading
-            "noplaylist": False,  # Allow playlist processing
-        }
-    )
-    playlist_ytdl = youtube_dl.YoutubeDL(playlist_ytdl_options)
-
     # Fetch the playlist items
     try:
         # First, get playlist info without downloading
@@ -812,11 +728,11 @@ async def playlist(ctx, *, query: str):
 @goon.command(name="setprefix", help="Allows to change the prefix of the bot in the guild")
 @commands.has_permissions(administrator=True)
 async def setprefix(ctx, prefix):
-    with open(prefix_path, "r") as f:
+    with open(file=PREFIX_PATH, mode="r", encoding="utf8") as f:
         prefixes = json.load(f)
-    current_prefix = prefixes.get(str(ctx.guild.id), default_prefix)
+    current_prefix = prefixes.get(str(ctx.guild.id), DEFAULT_PREFIX)
     prefixes[str(ctx.guild.id)] = prefix
-    with open(prefix_path, "w") as f:
+    with open(file=PREFIX_PATH, mode="w", encoding="utf8") as f:
         json.dump(prefixes, f, indent=2)
     await ctx.send(f"Prefix changed from {current_prefix} to {prefix}")
 
@@ -833,19 +749,19 @@ async def on_ready():
 
 @bot.event
 async def on_guild_join(guild):
-    with open(prefix_path, "r") as f:
+    with open(file=PREFIX_PATH, mode="r", encoding="utf8") as f:
         prefixes = json.load(f)
-    prefixes[str(guild.id)] = default_prefix
-    with open(prefix_path, "w") as f:
+    prefixes[str(guild.id)] = DEFAULT_PREFIX
+    with open(file=PREFIX_PATH, mode="w", encoding="utf8") as f:
         json.dump(prefixes, f, indent=2)
 
 
 @bot.event
 async def on_guild_remove(guild):
-    with open(prefix_path, "r") as f:
+    with open(file=PREFIX_PATH, mode="r", encoding="utf8") as f:
         prefixes = json.load(f)
     prefixes.pop(str(guild.id), None)
-    with open(prefix_path, "w") as f:
+    with open(file=PREFIX_PATH, mode="w", encoding="utf8") as f:
         json.dump(prefixes, f, indent=2)
 
 
@@ -963,12 +879,12 @@ async def on_voice_state_update(member, before, after):
 
 
 # Add these helper functions to format time and create progress bar
-def format_time(seconds):
+def format_time(seconds: float):
     """Convert seconds to MM:SS format"""
     if seconds is None:
-        return "0:00"
+        return "00:00"
     minutes, seconds = divmod(int(seconds), 60)
-    return f"{minutes}:{seconds:02d}"
+    return f"{minutes:02d}:{seconds:02d}"
 
 
 def create_progress_bar(current, total, length=20):
@@ -984,9 +900,9 @@ def create_progress_bar(current, total, length=20):
     empty = "┈" * (length - position - 1)
 
     # Create bar with playhead
-    bar = filled + "⚪" + empty
+    progress_bar = filled + "⚪" + empty
 
-    return bar
+    return progress_bar
 
 
 # Add a task to update the player periodically
