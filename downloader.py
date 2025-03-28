@@ -1,13 +1,19 @@
+"""
+Module for downloading/streaming the audio
+"""
+
 # 1st party modules
 import asyncio
+from typing import Any, Dict, Self
 
 # 3rd party modules
+from discord.player import AT
 from discord import FFmpegPCMAudio, PCMVolumeTransformer
 import yt_dlp
 
 ffmpeg_options = {
-    "options": "-vn -b:a 192k -af loudnorm",
     "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 10 -nostdin -analyzeduration 2000000 -probesize 1000000",
+    "options": "-vn -b:a 192k -af loudnorm",
 }
 
 ytdl_format_options = {
@@ -31,7 +37,8 @@ ytdl_format_options = {
     },
 }
 
-playlist_ytdl_options = ytdl_format_options.copy().update(
+playlist_ytdl_options = ytdl_format_options.copy()
+playlist_ytdl_options.update(
     {
         "extract_flat": "in_playlist",  # Better playlist extraction
         "ignoreerrors": True,  # Skip failed entries
@@ -51,18 +58,20 @@ playlist_ytdl = yt_dlp.YoutubeDL(playlist_ytdl_options)
 class YTDLSource(PCMVolumeTransformer):
     """Improved YouTube DL extractor with retry mechanism"""
 
-    def __init__(self, source, *, data, volume=0.5):
+    def __init__(self, source: AT, *, data: Dict[str, Any], volume: float = 0.5):
         super().__init__(source, volume)
-        self.data = data
-        self.title = data.get("title", "Unknown title")
-        self.url = data.get("url", "")
+        self.data: Dict[str, Any] = data
+        self.title: str = data.get("title", "Unknown title")
+        self.url: str = data.get("url", "")
 
     @classmethod
-    async def from_url(cls, url, *, loop=None, stream=False):
+    async def from_url(cls: type[Self], url: str, *, loop: asyncio.AbstractEventLoop = None, stream: bool = False) -> Self:
+        """returns a YTDLSource with the data from the provided URL"""
         loop = loop or asyncio.get_event_loop()
 
         # Try multiple times with different formats if needed
-        for attempt in range(3):
+        max_attempts: int = 3
+        for attempt in range(max_attempts):
             try:
                 # Wait between retries
                 if attempt > 0:
@@ -73,7 +82,7 @@ class YTDLSource(PCMVolumeTransformer):
                 ytdl_instance = yt_dlp.YoutubeDL(ytdl_format_options)
 
                 # Extract info
-                data = await loop.run_in_executor(None, lambda: ytdl_instance.extract_info(url, download=not stream))
+                data = await loop.run_in_executor(executor=None, func=lambda: ytdl_instance.extract_info(url=url, download=not stream))
 
                 if "entries" in data:
                     # Get the first item if it's a playlist
@@ -83,11 +92,11 @@ class YTDLSource(PCMVolumeTransformer):
                     continue
 
                 filename = data["url"] if stream else ytdl_instance.prepare_filename(data)
-                return cls(FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
+                return cls(FFmpegPCMAudio(source=filename, **ffmpeg_options), data=data)
 
             except Exception as e:
                 print(f"Stream extraction attempt {attempt+1} failed: {e}")
-                if attempt == 2:  # Last attempt failed
+                if attempt == max_attempts - 1:  # Last attempt failed
                     raise
 
         raise Exception("All extraction attempts failed")
