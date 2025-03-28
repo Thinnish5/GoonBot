@@ -1,3 +1,9 @@
+"""
+Main module for the GoonBot.
+GoonBot is a Discord music bot that allows users to play music from YouTube directly in their voice channels.
+It supports commands for joining, leaving, playing, pausing, resuming, stopping, and skipping songs.
+"""
+
 # 1st party modules
 import asyncio
 import json

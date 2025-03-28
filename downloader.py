@@ -7,14 +7,11 @@ import asyncio
 from typing import Any, Dict, Self
 
 # 3rd party modules
-from discord.player import AT
-from discord import FFmpegPCMAudio, PCMVolumeTransformer
+from discord import AudioSource, FFmpegPCMAudio, PCMVolumeTransformer
 import yt_dlp
 
-ffmpeg_options = {
-    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 10 -nostdin -analyzeduration 2000000 -probesize 1000000",
-    "options": "-vn -b:a 192k -af loudnorm",
-}
+# internal modules
+from globals import *  # pylint: disable=wildcard-import
 
 ytdl_format_options = {
     # Prefer more stable formats
@@ -58,14 +55,14 @@ playlist_ytdl = yt_dlp.YoutubeDL(playlist_ytdl_options)
 class YTDLSource(PCMVolumeTransformer):
     """Improved YouTube DL extractor with retry mechanism"""
 
-    def __init__(self, source: AT, *, data: Dict[str, Any], volume: float = 0.5):
+    def __init__(self, source: AudioSource, *, data: Dict[str, Any] = {}, volume: float = 0.5):
         super().__init__(source, volume)
         self.data: Dict[str, Any] = data
         self.title: str = data.get("title", "Unknown title")
         self.url: str = data.get("url", "")
 
     @classmethod
-    async def from_url(cls: type[Self], url: str, *, loop: asyncio.AbstractEventLoop = None, stream: bool = False) -> Self:
+    async def from_url(cls: type[Self], url: str, *, loop: asyncio.AbstractEventLoop | None = None, stream: bool = False) -> Self:
         """returns a YTDLSource with the data from the provided URL"""
         loop = loop or asyncio.get_event_loop()
 
@@ -82,20 +79,23 @@ class YTDLSource(PCMVolumeTransformer):
                 ytdl_instance = yt_dlp.YoutubeDL(ytdl_format_options)
 
                 # Extract info
-                data = await loop.run_in_executor(executor=None, func=lambda: ytdl_instance.extract_info(url=url, download=not stream))
+                result = await loop.run_in_executor(executor=None, func=lambda: ytdl_instance.extract_info(url=url, download=not stream))
+                if result is None:
+                    data = {}
+                elif isinstance(result, dict):
+                    data = result
+                else:
+                    raise Exception(f"Unknown type for {result}")
 
                 if "entries" in data:
                     # Get the first item if it's a playlist
                     data = data["entries"][0]
 
-                if not data:
-                    continue
-
                 filename = data["url"] if stream else ytdl_instance.prepare_filename(data)
-                return cls(FFmpegPCMAudio(source=filename, **ffmpeg_options), data=data)
+                return cls(FFmpegPCMAudio(source=filename, before_options=FFMPEG_BEFORE_OPTIONS, options=FFMPEG_OPTIONS), data=data)
 
             except Exception as e:
-                print(f"Stream extraction attempt {attempt+1} failed: {e}")
+                print(f"Stream extraction attempt {attempt + 1} failed: {e}")
                 if attempt == max_attempts - 1:  # Last attempt failed
                     raise
 
