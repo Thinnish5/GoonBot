@@ -5,4 +5,4 @@
 
 ### Checklist
 
-[] Bumped Build Info
+- [] Bumped Build Info
