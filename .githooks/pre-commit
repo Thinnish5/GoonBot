@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash +e
 
 echo "Running git pre-commit hook..."
 
@@ -19,20 +19,20 @@ if [ ! -d ".venv" ]; then
 fi
 source .venv/bin/activate
 
-# install development dependencies
+# install development-only dependencies
 pip install --quiet -r requirements-dev.txt
 
-# Apply Black formatter to all Python files at once
+echo "Running autotyper on modified files..."
+echo "$python_files" | xargs autotyping --safe
+
 echo "Running formatter on modified files..."
 echo "$python_files" | xargs black --line-length 160
 
-# Run Pylint on all Python files at once
 echo "Running linter on modified files..."
 echo "$python_files" | xargs pylint --max-line-length 160
 
-# Run Pyre checker
 echo "Running type checker on complete project..."
-pyre check
+echo "$python_files" | xargs mypy
 
 # Stage the modified files
 git add --update

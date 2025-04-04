@@ -4,11 +4,11 @@ Module for downloading/streaming the audio
 
 # 1st party modules
 import asyncio
-from typing import Any, Dict, Self
+from typing import Any, Self
 
 # 3rd party modules
 from discord import AudioSource, FFmpegPCMAudio, PCMVolumeTransformer
-import yt_dlp
+import yt_dlp  # type: ignore
 
 # internal modules
 from globals import FFMPEG_BEFORE_OPTIONS, FFMPEG_OPTIONS
@@ -55,9 +55,9 @@ playlist_ytdl = yt_dlp.YoutubeDL(playlist_ytdl_options)
 class YTDLSource(PCMVolumeTransformer):
     """Improved YouTube DL extractor with retry mechanism"""
 
-    def __init__(self, source: AudioSource, *, data: Dict[str, Any] = {}, volume: float = 0.5):
+    def __init__(self, source: AudioSource, *, data: dict[str, Any] = {}, volume: float = 0.5) -> None:
         super().__init__(source, volume)
-        self.data: Dict[str, Any] = data
+        self.data: dict[str, Any] = data
         self.title: str = data.get("title", "Unknown title")
         self.url: str = data.get("url", "")
 

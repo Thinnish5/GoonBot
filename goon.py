@@ -10,11 +10,13 @@ import json
 from pathlib import Path
 import random
 import time
+from typing import Any
 
 # 3rd party modules
 import discord
-from discord.ext import commands
-from discord.ext import tasks
+from discord import Guild, VoiceClient
+from discord.ext import commands, tasks
+from discord.ext.commands import Bot, Context
 
 # internal modules
 from downloader import YTDLSource, playlist_ytdl, ytdl
@@ -28,11 +30,13 @@ def read_token():
 
 
 # setup helpers
-async def get_guild_prefix(guid_id: int):
+async def get_guild_prefix(guid: Guild | None):
+    if guid is None:
+        return DEFAULT_PREFIX
     try:
         with open(file=PREFIX_PATH, mode="r", encoding="utf8") as f:
             prefixes = json.load(f)
-            return prefixes.get(str(guid_id), DEFAULT_PREFIX)
+            return prefixes.get(str(guid.id), DEFAULT_PREFIX)
     except (FileNotFoundError, json.decoder.JSONDecodeError):
         Path(DATA_DIR).mkdir(parents=True, exist_ok=True)
         with open(file=PREFIX_PATH, mode="w", encoding="utf8") as f:
@@ -41,7 +45,7 @@ async def get_guild_prefix(guid_id: int):
 
 
 async def get_prefix(bot, message: discord.Message):
-    prefix = await get_guild_prefix(message.guild.id)
+    prefix = await get_guild_prefix(message.guild)
     return commands.when_mentioned_or(prefix)(bot, message)
 
 
@@ -51,57 +55,61 @@ intents.message_content = True
 bot = commands.Bot(command_prefix=get_prefix, intents=intents)
 
 # Queue system
-queue = []
+queue: list[str] = list()
 
 # Store player message references for each guild
-player_messages = {}
+player_messages: dict[int, discord.Message] = dict()
 
 # Add a dictionary to track the channels where the player should be shown
-player_channels = {}
+player_channels: dict[int, int] = dict()
 
 # Add this missing variable for tracking current songs
-current_songs = {}
+current_songs: dict[int, dict[str, Any]] = dict()
 
 
 # Create a UI class for the player controls
 class MusicPlayerView(discord.ui.View):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(timeout=None)  # Persistent view
 
     @discord.ui.button(label="⏯️ Play/Pause", style=discord.ButtonStyle.primary, custom_id="play_pause")
-    async def play_pause_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        ctx = await bot.get_context(interaction.message)
-        voice_client = interaction.guild.voice_client
-        guild_id = interaction.guild.id
+    async def play_pause_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        if interaction.guild is None or not isinstance(interaction.guild.voice_client, VoiceClient):
+            return
 
-        if voice_client:
-            if voice_client.is_paused():
-                voice_client.resume()
-                # Update pause tracking for progress bar
-                if guild_id in current_songs:
-                    info = current_songs[guild_id]
-                    if info.get("paused_at"):
-                        # Add the pause duration to total pause time
-                        info["total_pause_time"] += time.time() - info["paused_at"]
-                        info["paused_at"] = None
-                    info["playing"] = True
-                await interaction.response.send_message("Resumed playback", ephemeral=True, delete_after=5)
-            elif voice_client.is_playing():
-                voice_client.pause()
-                # Track when we paused
-                if guild_id in current_songs:
-                    current_songs[guild_id]["playing"] = False
-                    current_songs[guild_id]["paused_at"] = time.time()
-                await interaction.response.send_message("Paused playback", ephemeral=True, delete_after=5)
-            else:
-                await interaction.response.send_message("Nothing is playing", ephemeral=True, delete_after=5)
+        guild_id = interaction.guild.id
+        voice_client = interaction.guild.voice_client
+        if voice_client.is_paused():
+            voice_client.resume()
+            # Update pause tracking for progress bar
+            if guild_id in current_songs:
+                info = current_songs[guild_id]
+                if info.get("paused_at"):
+                    # Add the pause duration to total pause time
+                    info["total_pause_time"] += time.time() - info["paused_at"]
+                    info["paused_at"] = None
+                info["playing"] = True
+            await interaction.response.send_message("Resumed playback", ephemeral=True, delete_after=5)
+        elif voice_client.is_playing():
+            voice_client.pause()
+            # Track when we paused
+            if guild_id in current_songs:
+                current_songs[guild_id]["playing"] = False
+                current_songs[guild_id]["paused_at"] = time.time()
+            await interaction.response.send_message("Paused playback", ephemeral=True, delete_after=5)
+        else:
+            await interaction.response.send_message("Nothing is playing", ephemeral=True, delete_after=5)
 
         # Update the player
+        ctx = await bot.get_context(interaction)
         await update_player(ctx)
 
     @discord.ui.button(label="⏭️ Skip", style=discord.ButtonStyle.primary, custom_id="skip")
-    async def skip_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        ctx = await bot.get_context(interaction.message)
+    async def skip_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        if interaction.guild is None or not isinstance(interaction.guild.voice_client, VoiceClient):
+            return
+
+        ctx = await bot.get_context(interaction)
         voice_client = interaction.guild.voice_client
 
         if voice_client and voice_client.is_playing():
@@ -111,8 +119,11 @@ class MusicPlayerView(discord.ui.View):
             await interaction.response.send_message("Nothing to skip", ephemeral=True, delete_after=5)
 
     @discord.ui.button(label="⏹️ Stop", style=discord.ButtonStyle.danger, custom_id="stop")
-    async def stop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        ctx = await bot.get_context(interaction.message)
+    async def stop_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        if interaction.guild is None or not isinstance(interaction.guild.voice_client, VoiceClient):
+            return
+
+        ctx = await bot.get_context(interaction)
         voice_client = interaction.guild.voice_client
 
         if voice_client and (voice_client.is_playing() or voice_client.is_paused()):
@@ -126,7 +137,7 @@ class MusicPlayerView(discord.ui.View):
         await update_player(ctx)
 
     @discord.ui.button(label="📋 Show Queue", style=discord.ButtonStyle.secondary, custom_id="queue")
-    async def queue_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def queue_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         # Defer the response immediately to prevent timeout
         await interaction.response.defer(ephemeral=True)
 
@@ -138,8 +149,8 @@ class MusicPlayerView(discord.ui.View):
 
     # Add this button to your MusicPlayerView class
     @discord.ui.button(label="🔀 Shuffle", style=discord.ButtonStyle.secondary, custom_id="shuffle")
-    async def shuffle_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        ctx = await bot.get_context(interaction.message)
+    async def shuffle_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        ctx = await bot.get_context(interaction)
 
         if len(queue) <= 1:
             await interaction.response.send_message("Need at least 2 songs in the queue to shuffle.", ephemeral=True)
@@ -155,7 +166,7 @@ class MusicPlayerView(discord.ui.View):
 # Function to create or update the player message
 # Update the update_player function to use stored song information
 # Update the update_player function to show thumbnails
-async def update_player(ctx, song_title=None, is_playing=False):
+async def update_player(ctx: Context[Bot], song_title=None, is_playing: bool = False) -> None:
     guild_id = ctx.guild.id
 
     # Track this channel as having a player
@@ -231,7 +242,7 @@ async def update_player(ctx, song_title=None, is_playing=False):
 
 
 # Add this helper function to clean up previous player messages
-async def cleanup_previous_player_messages(ctx):
+async def cleanup_previous_player_messages(ctx) -> None:
     """Find and delete old player messages from the bot in the current channel"""
     try:
         # Get recent messages in the channel
@@ -260,11 +271,11 @@ async def cleanup_previous_player_messages(ctx):
 
 
 # Function to play the next song in the queue
-async def play_next(ctx):
+async def play_next(ctx) -> None:
     if len(queue) > 0:
         query = queue[0]
         try:
-            player: YTDLSource = await YTDLSource.from_url(url=query, loop=bot.loop, stream=True)
+            player = await YTDLSource.from_url(url=query, loop=bot.loop, stream=True)
             queue.pop(0)
 
             # Extract thumbnail URL from the data
@@ -312,7 +323,7 @@ async def play_next(ctx):
 
 
 # Add this helper function to handle playback errors
-async def handle_playback_error(error, ctx):
+async def handle_playback_error(error, ctx) -> None:
     if error:
         print(f"Playback error: {error}")
     await play_next(ctx)
@@ -320,7 +331,7 @@ async def handle_playback_error(error, ctx):
 
 # Create a command group for GoonBot
 @bot.group(name="goon", invoke_without_command=True)
-async def goon(ctx, *, query: str = None):
+async def goon(ctx: Context[Bot], *, query: str) -> None:
     if query is None:
         await ctx.send("Please provide a search query. Usage: `!goon <query>`")
         return
@@ -384,13 +395,13 @@ async def goon(ctx, *, query: str = None):
 
 
 @goon.command(name="info", help="Shows information about the bot")
-async def info(ctx):
+async def info(ctx) -> None:
     await ctx.send(f"Build date: {BUILD_DATE}")
 
 
 # Command: !goon search <query>
 @goon.command(name="search", help="Searches for a song and lets you select from the top 5 results")
-async def search(ctx, *, query: str):
+async def search(ctx: Context[Bot], *, query: str) -> None:
     if not query:
         await ctx.send("Please provide a search query. Usage: `!goon search <query>`")
         return
@@ -425,7 +436,7 @@ async def search(ctx, *, query: str):
             await sent_message.add_reaction(emoji)
 
         # Set up a task to delete the message after 30 seconds
-        async def delete_after_delay():
+        async def delete_after_delay() -> None:
             await asyncio.sleep(30)
             try:
                 await sent_message.delete()
@@ -480,7 +491,7 @@ async def search(ctx, *, query: str):
 
 
 # Helper function to generate queue display
-async def get_queue_display():
+async def get_queue_display() -> str:
     if len(queue) == 0:
         return "The queue is empty."
 
@@ -515,7 +526,7 @@ async def get_queue_display():
 
 # Command: !goon queue
 @goon.command(name="queue", help="Displays the current queue")
-async def show_queue(ctx):
+async def show_queue(ctx) -> None:
     queue_display = await get_queue_display()
     # Using ephemeral=True to make it visible only to the user
     await ctx.send(queue_display, ephemeral=True)
@@ -523,7 +534,7 @@ async def show_queue(ctx):
 
 # Command: !goon skip
 @goon.command(name="skip", help="Skips the current song")
-async def skip(ctx):
+async def skip(ctx) -> None:
     voice_client = ctx.message.guild.voice_client
     if voice_client.is_playing():
         voice_client.stop()
@@ -534,7 +545,7 @@ async def skip(ctx):
 
 # Command: !goon leave
 @goon.command(name="leave", help="Leaves the voice channel")
-async def leave(ctx):
+async def leave(ctx) -> None:
     voice_client = ctx.message.guild.voice_client
     if voice_client and voice_client.is_connected:
         # Clear the player message before leaving
@@ -558,7 +569,7 @@ async def leave(ctx):
 
 # Command: !goon pause
 @goon.command(name="pause", help="Pauses the current song")
-async def pause(ctx):
+async def pause(ctx) -> None:
     voice_client = ctx.message.guild.voice_client
     if voice_client.is_playing():
         voice_client.pause()
@@ -568,7 +579,7 @@ async def pause(ctx):
 
 # Command: !goon resume
 @goon.command(name="resume", help="Resumes the paused song")
-async def resume(ctx):
+async def resume(ctx) -> None:
     voice_client = ctx.message.guild.voice_client
     if voice_client.is_paused():
         voice_client.resume()
@@ -578,7 +589,7 @@ async def resume(ctx):
 
 # Command: !goon stop
 @goon.command(name="stop", help="Stops the current song")
-async def stop(ctx):
+async def stop(ctx) -> None:
     voice_client = ctx.message.guild.voice_client
     if voice_client.is_playing():
         voice_client.stop()
@@ -588,7 +599,7 @@ async def stop(ctx):
 
 
 @goon.command(name="help", help="Displays the help message")
-async def bot_help(ctx):
+async def bot_help(ctx) -> None:
     await ctx.send(
         "GoonBot is a music bot that can play songs from YouTube. Usage:\n"
         "1. `!goon <query>`: Plays the song with the given query.\n"
@@ -606,7 +617,7 @@ async def bot_help(ctx):
 
 # Command: !goon shuffle
 @goon.command(name="shuffle", help="Shuffles the songs in the queue")
-async def shuffle(ctx):
+async def shuffle(ctx) -> None:
     if len(queue) <= 1:
         await ctx.send("Need at least 2 songs in the queue to shuffle.")
         return
@@ -620,7 +631,7 @@ async def shuffle(ctx):
 
 # Command: !goon playlist <name or link>
 @goon.command(name="playlist", help="Plays a playlist by name or link")
-async def playlist(ctx, *, query: str):
+async def playlist(ctx: Context[Bot], *, query: str) -> None:
     playlists = {
         "all": "https://www.youtube.com/playlist?list=PLEMIbGkCIAqDaWDz1hwg04BwSbDXDlPCh",
         "good": "https://www.youtube.com/playlist?list=PLEMIbGkCIAqDObuOVPqYQCyaibK8aYsI3",
@@ -727,7 +738,7 @@ async def playlist(ctx, *, query: str):
 
 @goon.command(name="setprefix", help="Allows to change the prefix of the bot in the guild")
 @commands.has_permissions(administrator=True)
-async def setprefix(ctx, prefix):
+async def setprefix(ctx: Context[Bot], *, prefix: str) -> None:
     with open(file=PREFIX_PATH, mode="r", encoding="utf8") as f:
         prefixes = json.load(f)
     current_prefix = prefixes.get(str(ctx.guild.id), DEFAULT_PREFIX)
@@ -739,7 +750,7 @@ async def setprefix(ctx, prefix):
 
 # Add this before bot.run(read_token())
 @bot.event
-async def on_ready():
+async def on_ready() -> None:
     print(f"Bot is ready! Logged in as {bot.user}")
     # Register the persistent view
     bot.add_view(MusicPlayerView())
@@ -748,7 +759,7 @@ async def on_ready():
 
 
 @bot.event
-async def on_guild_join(guild):
+async def on_guild_join(guild) -> None:
     with open(file=PREFIX_PATH, mode="r", encoding="utf8") as f:
         prefixes = json.load(f)
     prefixes[str(guild.id)] = DEFAULT_PREFIX
@@ -757,7 +768,7 @@ async def on_guild_join(guild):
 
 
 @bot.event
-async def on_guild_remove(guild):
+async def on_guild_remove(guild) -> None:
     with open(file=PREFIX_PATH, mode="r", encoding="utf8") as f:
         prefixes = json.load(f)
     prefixes.pop(str(guild.id), None)
@@ -767,7 +778,7 @@ async def on_guild_remove(guild):
 
 # Add this event to listen for new messages
 @bot.event
-async def on_message(message):
+async def on_message(message: discord.Message) -> None:
     # Don't process commands here, just watch for new messages
     if message.author == bot.user:
         return
@@ -775,8 +786,11 @@ async def on_message(message):
     # Process commands first
     await bot.process_commands(message)
 
+    if message.guild is None:
+        return
+
     # Check if this channel has a player
-    guild_id = message.guild.id if message.guild else None
+    guild_id = message.guild.id
     if guild_id and guild_id in player_channels and player_channels[guild_id] == message.channel.id:
         # Get context for sending messages
         ctx = await bot.get_context(message)
@@ -785,18 +799,15 @@ async def on_message(message):
         if guild_id in player_messages:
             # Delete the old player message
             try:
-                old_message = player_messages[guild_id]
-                await old_message.delete()
+                await player_messages[guild_id].delete()
             except (discord.NotFound, AttributeError):
                 # Message might already be deleted
                 pass
-            # Create a new player message
-            player_messages[guild_id] = None
             await update_player(ctx)
 
 
 @bot.event
-async def on_voice_state_update(member, before, after):
+async def on_voice_state_update(member, before, after) -> None:
     # First handle the bot's own disconnects
     if member.id == bot.user.id:
         if before.channel is not None and after.channel is None:
@@ -879,7 +890,7 @@ async def on_voice_state_update(member, before, after):
 
 
 # Add these helper functions to format time and create progress bar
-def format_time(seconds: float):
+def format_time(seconds: float) -> str:
     """Convert seconds to MM:SS format"""
     if seconds is None:
         return "00:00"
@@ -887,7 +898,7 @@ def format_time(seconds: float):
     return f"{minutes:02d}:{seconds:02d}"
 
 
-def create_progress_bar(current, total, length=20):
+def create_progress_bar(current, total: int, length: int = 20):
     if total <= 0:
         return "┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈"
 
@@ -907,7 +918,7 @@ def create_progress_bar(current, total, length=20):
 
 # Add a task to update the player periodically
 @tasks.loop(seconds=1)
-async def update_progress_bars():
+async def update_progress_bars() -> None:
     """Update all active players to show current progress"""
     for guild_id, info in list(current_songs.items()):
         if info.get("playing", False) and info.get("duration", 0) > 0:
