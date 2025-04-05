@@ -26,12 +26,14 @@ from globals import BUILD_DATE, DATA_DIR, DEFAULT_PREFIX, PREFIX_PATH, SECRET_FI
 
 # Function to read the bot token from secret.secret
 def read_token():
+    """Reads the bot token from the secret file."""
     with open(file=SECRET_FILE, mode="r", encoding="utf8") as file:
         return file.read().strip()
 
 
 # setup helpers
 async def get_guild_prefix(guid: Guild | None):
+    """Reads the prefix for the boot to use for a guild from the prefix file."""
     if guid is None:
         return DEFAULT_PREFIX
     try:
@@ -45,9 +47,10 @@ async def get_guild_prefix(guid: Guild | None):
         return DEFAULT_PREFIX
 
 
-async def get_prefix(bot, message: discord.Message):
+async def get_prefix(bot_arg: Bot, message: discord.Message):
+    """Returns the prefix for the bot to use for a guild."""
     prefix = await get_guild_prefix(message.guild)
-    return commands.when_mentioned_or(prefix)(bot, message)
+    return commands.when_mentioned_or(prefix)(bot_arg, message)
 
 
 # Bot setup
@@ -56,25 +59,28 @@ intents.message_content = True
 bot = commands.Bot(command_prefix=get_prefix, intents=intents)
 
 # Queue system
-queue: list[str] = list()
+queue: list[str] = []
 
 # Store player message references for each guild
-player_messages: dict[int, discord.Message] = dict()
+player_messages: dict[int, discord.Message] = {}
 
 # Add a dictionary to track the channels where the player should be shown
-player_channels: dict[int, int] = dict()
+player_channels: dict[int, int] = {}
 
 # Add this missing variable for tracking current songs
-current_songs: dict[int, dict[str, Any]] = dict()
+current_songs: dict[int, dict[str, Any]] = {}
 
 
 # Create a UI class for the player controls
 class MusicPlayerView(discord.ui.View):
+    """A view for the music player controls."""
+
     def __init__(self) -> None:
         super().__init__(timeout=None)  # Persistent view
 
     @discord.ui.button(label="⏯️ Play/Pause", style=discord.ButtonStyle.primary, custom_id="play_pause")
     async def play_pause_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        """Allows users to play or pause the bot interacting with the button."""
         if interaction.guild is None or not isinstance(interaction.guild.voice_client, VoiceClient):
             return
 
@@ -101,12 +107,12 @@ class MusicPlayerView(discord.ui.View):
         else:
             await interaction.response.send_message("Nothing is playing", delete_after=5)
 
-        # Update the player
         ctx = await bot.get_context(interaction)
         await update_player(ctx)
 
     @discord.ui.button(label="⏭️ Skip", style=discord.ButtonStyle.primary, custom_id="skip")
     async def skip_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        """Allows users to skip the current song interacting with the button."""
         if interaction.guild is None or not isinstance(interaction.guild.voice_client, VoiceClient):
             return
 
@@ -117,12 +123,12 @@ class MusicPlayerView(discord.ui.View):
         else:
             await interaction.response.send_message("Nothing to skip", delete_after=5)
 
-        # Update the player
         ctx = await bot.get_context(interaction)
         await update_player(ctx)
 
     @discord.ui.button(label="⏹️ Stop", style=discord.ButtonStyle.danger, custom_id="stop")
     async def stop_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        """Allows users to stop the current song and clear the queue interacting with the button."""
         if interaction.guild is None or not isinstance(interaction.guild.voice_client, VoiceClient):
             return
 
@@ -134,12 +140,12 @@ class MusicPlayerView(discord.ui.View):
         else:
             await interaction.response.send_message("Nothing is playing", delete_after=5)
 
-        # Update the player
         ctx = await bot.get_context(interaction)
         await update_player(ctx)
 
     @discord.ui.button(label="📋 Show Queue", style=discord.ButtonStyle.secondary, custom_id="queue")
     async def queue_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        """Allows users to show the current queue interacting with the button."""
         # Defer the response immediately to prevent timeout
         await interaction.response.defer(ephemeral=True)
 
@@ -149,11 +155,9 @@ class MusicPlayerView(discord.ui.View):
         # Send followup instead of direct response
         await interaction.followup.send(queue_display, ephemeral=True)
 
-    # Add this button to your MusicPlayerView class
     @discord.ui.button(label="🔀 Shuffle", style=discord.ButtonStyle.secondary, custom_id="shuffle")
     async def shuffle_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        ctx = await bot.get_context(interaction)
-
+        """Allows users to shuffle the queue interacting with the button."""
         if len(queue) <= 1:
             await interaction.response.send_message("Need at least 2 songs in the queue to shuffle.", ephemeral=True)
             return
@@ -161,16 +165,17 @@ class MusicPlayerView(discord.ui.View):
         random.shuffle(queue)
         await interaction.response.send_message("🔀 Queue has been shuffled!", ephemeral=True)
 
-        # Update the player to show the new queue
+        ctx = await bot.get_context(interaction)
         await update_player(ctx)
 
 
-# Function to create or update the player message
-# Update the update_player function to use stored song information
-# Update the update_player function to show thumbnails
 async def update_player(ctx: Context[Bot], song_title=None, is_playing: bool = False) -> None:
+    """Function to create or update the player message.
+    Update the update_player function to use stored song information.
+    Update the update_player function to show thumbnails."""
     if ctx.guild is None:
         return
+
     guild_id = ctx.guild.id
 
     # Track this channel as having a player
@@ -179,6 +184,8 @@ async def update_player(ctx: Context[Bot], song_title=None, is_playing: bool = F
     # Create embed for player
     embed = discord.Embed(title="🎵 GoonBot Music Player 🤤", color=discord.Color.blurple())
 
+    progress_bar = None
+    time_display = None
     # Check if we have current song info (this takes priority)
     if guild_id in current_songs:
         info = current_songs[guild_id]
@@ -204,9 +211,6 @@ async def update_player(ctx: Context[Bot], song_title=None, is_playing: bool = F
             # Create progress display
             progress_bar = create_progress_bar(elapsed, duration)
             time_display = f"{format_time(elapsed)}/{format_time(duration)}"
-        else:
-            progress_bar = None
-            time_display = None
 
     if song_title and is_playing:
         if progress_bar and time_display:
@@ -256,18 +260,16 @@ async def cleanup_previous_player_messages(ctx: Context[Bot]) -> None:
         messages = [msg async for msg in ctx.channel.history(limit=15)]
 
         # Filter for bot's messages that look like player messages
-        player_messages_list: list[Message] = list()
+        player_messages_list: list[Message] = []
         for msg in messages:
             # Check if the message is from our bot
             if msg.author.id == bot.user.id:
-                # Check if the message has embeds
-                if msg.embeds:
-                    # Look through each embed to see if it's a music player
-                    for embed in msg.embeds:
-                        if embed.title and "GoonBot Music Player" in embed.title:
-                            # This is a music player message from our bot
-                            player_messages_list.append(msg)
-                            break  # No need to check other embeds
+                # Look through each embed to see if it's a music player
+                for embed in msg.embeds:
+                    if embed.title is not None and "GoonBot Music Player" in embed.title:
+                        # This is a music player message from our bot
+                        player_messages_list.append(msg)
+                        break  # No need to check other embeds
 
         # If there's more than one, delete all except the most recent
         if len(player_messages_list) > 1:
@@ -285,9 +287,10 @@ async def cleanup_previous_player_messages(ctx: Context[Bot]) -> None:
 
 # Function to play the next song in the queue
 async def play_next(ctx: Context[Bot]) -> None:
+    """Plays the next song in the queue."""
     if ctx.guild is None or not isinstance(ctx.voice_client, VoiceClient):
         return
-    elif len(queue) == 0:
+    if len(queue) == 0:
         # Clear current song when queue is empty
         if ctx.guild.id in current_songs:
             del current_songs[ctx.guild.id]
@@ -336,14 +339,15 @@ async def play_next(ctx: Context[Bot]) -> None:
 
 # Add this helper function to handle playback errors
 async def handle_playback_error(error, ctx) -> None:
+    """Handles playback errors and plays the next song in the queue."""
     if error:
         print(f"Playback error: {error}")
     await play_next(ctx)
 
 
-# Create a command group for GoonBot
 @bot.group(name="goon", invoke_without_command=True)
 async def goon(ctx: Context[Bot], *, query: str | None) -> None:
+    """Create a command group for GoonBot"""
     if query is None or query == "":
         await ctx.send("Please provide a search query. Usage: `!goon <query>`")
         return
@@ -396,13 +400,15 @@ async def goon(ctx: Context[Bot], *, query: str | None) -> None:
 
 
 @goon.command(name="info", help="Shows information about the bot")
-async def info(ctx: Context[Bot]) -> None:
+async def build_info(ctx: Context[Bot]) -> None:
+    """Shows information about the bot."""
     await ctx.send(f"Build date: {BUILD_DATE}")
 
 
 # Command: !goon search <query>
 @goon.command(name="search", help="Searches for a song and lets you select from the top 5 results")
 async def search(ctx: Context[Bot], *, query: str | None) -> None:
+    """Searches for a song and lets you select from the top 5 results."""
     if query is None or query == "":
         await ctx.send("Please provide a search query. Usage: `!goon <query>`")
         return
@@ -414,7 +420,7 @@ async def search(ctx: Context[Bot], *, query: str | None) -> None:
     try:
         data = await bot.loop.run_in_executor(None, lambda: ytdl.extract_info(f"ytsearch5:{query}", download=False))
         if "entries" not in data or len(data["entries"]) == 0:
-            await ctx.send("No results found.")
+            await ctx.send("No results found.", delete_after=5)
             return
 
         # Display the top 5 results
@@ -495,13 +501,13 @@ async def connect_to_channel(ctx: Context[Bot]) -> Context[Bot] | None:
         if channel is None:
             await ctx.send(f"Could not find {ctx.message.author.name} voice channel", delete_after=5)
             return None
-        else:
-            await channel.connect()
+        await channel.connect()
     return ctx
 
 
 # Helper function to generate queue display
 async def get_queue_display() -> str:
+    """Generates a string representation of the current queue."""
     if len(queue) == 0:
         return "The queue is empty."
 
@@ -520,7 +526,7 @@ async def get_queue_display() -> str:
             else:
                 title = item
             queue_items.append(f"{i + 1}. `{title}`")
-        except:
+        except Exception:
             # If we can't extract a title, just use the query string
             queue_items.append(f"{i + 1}. `{item}`")
 
@@ -537,6 +543,7 @@ async def get_queue_display() -> str:
 # Command: !goon queue
 @goon.command(name="queue", help="Displays the current queue")
 async def show_queue(ctx: Context[Bot]) -> None:
+    """Displays the current queue."""
     queue_display = await get_queue_display()
     # Using ephemeral=True to make it visible only to the user
     await ctx.send(queue_display, ephemeral=True)
@@ -545,6 +552,7 @@ async def show_queue(ctx: Context[Bot]) -> None:
 # Command: !goon skip
 @goon.command(name="skip", help="Skips the current song")
 async def skip(ctx: Context[Bot]) -> None:
+    """Skips the current song."""
     if isinstance(ctx.voice_client, VoiceClient) and ctx.voice_client.is_playing():
         ctx.voice_client.stop()
         await ctx.send("Skipped the current song.", delete_after=5)
@@ -555,9 +563,11 @@ async def skip(ctx: Context[Bot]) -> None:
 # Command: !goon leave
 @goon.command(name="leave", help="Leaves the voice channel")
 async def leave(ctx: Context[Bot]) -> None:
+    """Leaves the voice channel and clears the queue."""
     if ctx.guild is None:
         return
-    elif isinstance(ctx.voice_client, VoiceClient) and ctx.voice_client.is_connected():
+
+    if isinstance(ctx.voice_client, VoiceClient) and ctx.voice_client.is_connected():
         # Clear the player message before leaving
         guild_id = ctx.guild.id
         if guild_id in player_messages:
@@ -580,6 +590,7 @@ async def leave(ctx: Context[Bot]) -> None:
 # Command: !goon pause
 @goon.command(name="pause", help="Pauses the current song")
 async def pause(ctx: Context[Bot]) -> None:
+    """Pauses the current song."""
     if isinstance(ctx.voice_client, VoiceClient) and ctx.voice_client.is_playing():
         ctx.voice_client.pause()
     else:
@@ -589,6 +600,7 @@ async def pause(ctx: Context[Bot]) -> None:
 # Command: !goon resume
 @goon.command(name="resume", help="Resumes the paused song")
 async def resume(ctx: Context[Bot]) -> None:
+    """Resumes the paused song."""
     if isinstance(ctx.voice_client, VoiceClient) and ctx.voice_client.is_paused():
         ctx.voice_client.resume()
     else:
@@ -598,6 +610,7 @@ async def resume(ctx: Context[Bot]) -> None:
 # Command: !goon stop
 @goon.command(name="stop", help="Stops the current song")
 async def stop(ctx: Context[Bot]) -> None:
+    """Stops the current song and clears the queue."""
     if isinstance(ctx.voice_client, VoiceClient) and ctx.voice_client.is_playing():
         ctx.voice_client.stop()
         queue.clear()  # Clear the queue when the bot stops
@@ -607,6 +620,7 @@ async def stop(ctx: Context[Bot]) -> None:
 
 @goon.command(name="help", help="Displays the help message")
 async def bot_help(ctx: Context[Bot]) -> None:
+    """Sends an help message with usage instructions."""
     await ctx.send(
         "GoonBot is a music bot that can play songs from YouTube. Usage:\n"
         "1. `!goon <query>`: Plays the song with the given query.\n"
@@ -625,6 +639,7 @@ async def bot_help(ctx: Context[Bot]) -> None:
 # Command: !goon shuffle
 @goon.command(name="shuffle", help="Shuffles the songs in the queue")
 async def shuffle(ctx: Context[Bot]) -> None:
+    """Shuffles the songs in the queue."""
     if len(queue) <= 1:
         await ctx.send("Need at least 2 songs in the queue to shuffle.", delete_after=5)
         return
@@ -637,8 +652,9 @@ async def shuffle(ctx: Context[Bot]) -> None:
 
 
 # Command: !goon playlist <name or link>
-@goon.command(name="playlist", help="Plays a playlist by name or link")
+@goon.command(name="playlist", help="Plays a playlist by name or URL")
 async def playlist(ctx: Context[Bot], *, query: str) -> None:
+    """Adds a playlist to the queue by name or URL."""
     playlists = {
         "all": "https://www.youtube.com/playlist?list=PLEMIbGkCIAqDaWDz1hwg04BwSbDXDlPCh",
         "good": "https://www.youtube.com/playlist?list=PLEMIbGkCIAqDObuOVPqYQCyaibK8aYsI3",
@@ -739,6 +755,7 @@ async def playlist(ctx: Context[Bot], *, query: str) -> None:
 @goon.command(name="setprefix", help="Allows to change the prefix of the bot in the guild")
 @commands.has_permissions(administrator=True)
 async def setprefix(ctx: Context[Bot], *, prefix: str) -> None:
+    """Sets the prefix for the bot in the guild."""
     if ctx.guild is None:
         return
 
@@ -754,8 +771,9 @@ async def setprefix(ctx: Context[Bot], *, prefix: str) -> None:
 # Add this before bot.run(read_token())
 @bot.event
 async def on_ready() -> None:
+    """Called when the bot is ready."""
     if bot.user is None:
-        print(f"There was an issue with the bot logging in.")
+        print("There was an issue with the bot logging in.")
     else:
         print(f"Bot is ready! Logged in as {bot.user}")
         # Register the persistent view
@@ -766,6 +784,7 @@ async def on_ready() -> None:
 
 @bot.event
 async def on_guild_join(guild: Guild) -> None:
+    """Does a startup when the bot is added to a guild"""
     with open(file=PREFIX_PATH, mode="r", encoding="utf8") as f:
         prefixes = json.load(f)
     prefixes[str(guild.id)] = DEFAULT_PREFIX
@@ -775,6 +794,7 @@ async def on_guild_join(guild: Guild) -> None:
 
 @bot.event
 async def on_guild_remove(guild: Guild) -> None:
+    """Does a cleanup when the bot is removed from a guild"""
     with open(file=PREFIX_PATH, mode="r", encoding="utf8") as f:
         prefixes = json.load(f)
     prefixes.pop(str(guild.id), None)
@@ -785,6 +805,7 @@ async def on_guild_remove(guild: Guild) -> None:
 # Add this event to listen for new messages
 @bot.event
 async def on_message(message: discord.Message) -> None:
+    """Handles new messages in the server."""
     # Don't process commands here, just watch for new messages
     if message.author == bot.user:
         return
@@ -812,47 +833,43 @@ async def on_message(message: discord.Message) -> None:
             await update_player(ctx)
 
 
+async def on_bot_voice_disconnect(guild_id: int) -> None:
+    """Handles the bot's voice disconnect event."""
+    # Clean up the player message
+    if guild_id in player_messages:
+        try:
+            # Get the message and delete it
+            old_message = player_messages[guild_id]
+            await old_message.delete()
+
+            # Remove from dictionaries
+            player_messages.pop(guild_id, None)
+            player_channels.pop(guild_id, None)
+        except (discord.NotFound, AttributeError, discord.HTTPException):
+            # Handle any errors during deletion
+            pass
+
+
 @bot.event
 async def on_voice_state_update(member: Member, before: VoiceState, after: VoiceState) -> None:
+    """Handles voice state updates for members in a voice channel."""
     if bot.user is None:
         return
 
     # First handle the bot's own disconnects
     if member.id == bot.user.id:
         if before.channel is not None and after.channel is None:
-            guild_id = before.channel.guild.id
-
-            # Clean up the player message
-            if guild_id in player_messages:
-                try:
-                    # Get the channel where the player is
-                    channel_id = player_channels.get(guild_id)
-                    if channel_id:
-                        channel = bot.get_channel(channel_id)
-                        if channel:
-                            # Get the message and delete it
-                            old_message = player_messages[guild_id]
-                            await old_message.delete()
-
-                    # Remove from dictionaries
-                    player_messages.pop(guild_id, None)
-                    player_channels.pop(guild_id, None)
-                except (discord.NotFound, AttributeError, discord.HTTPException):
-                    # Handle any errors during deletion
-                    pass
-
+            on_bot_voice_disconnect(before.channel.guild.id)
         # handling for voice connection errors
         if hasattr(after, "channel") and after.channel is not None:
             if hasattr(after, "self_deaf") and after.self_deaf is True:
                 print(f"Bot reconnected to voice in {after.channel.guild.name}")
-        return
 
     # Now handle when a user disconnects from a voice channel
     if before.channel is not None and (after.channel is None or after.channel.id != before.channel.id):
         # Check if the bot is in this channel
         voice_client = before.channel.guild.voice_client
         if isinstance(voice_client, VoiceClient) and voice_client.channel.id == before.channel.id:
-
             # Count remaining human users in the channel
             human_members = [m for m in before.channel.members if not m.bot and m.id != bot.user.id]
 
@@ -862,10 +879,11 @@ async def on_voice_state_update(member: Member, before: VoiceState, after: Voice
                 print(f"All users left voice channel in {before.channel.guild.name} - disconnecting")
 
                 guild_id = before.channel.guild.id
-
+                old_message = None
+                channel = None
                 # First, properly store message reference before cleanup
                 if guild_id in player_messages and player_messages[guild_id]:
-                    old__player_message = player_messages[guild_id]
+                    old_message = player_messages[guild_id]
 
                     # Get the text channel reference
                     channel_id = player_channels.get(guild_id)
@@ -880,9 +898,9 @@ async def on_voice_state_update(member: Member, before: VoiceState, after: Voice
                     del current_songs[guild_id]
 
                 # Now delete the player message AFTER disconnecting
-                if old__player_message is not None and isinstance(channel, TextChannel):
+                if old_message is not None and isinstance(channel, TextChannel):
                     try:
-                        await old__player_message.delete()
+                        await old_message.delete()
                         print(f"Successfully deleted player message in {channel.name}")
                     except Exception as e:
                         print(f"Error deleting player message: {e}")
@@ -906,6 +924,7 @@ def format_time(seconds: float) -> str:
 
 
 def create_progress_bar(current, total: int, length: int = 20):
+    """Create a progress bar string"""
     if total <= 0:
         return "┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈"
 
