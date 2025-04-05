@@ -15,7 +15,7 @@ from typing import Any
 
 # 3rd party modules
 import discord
-from discord import Guild, Member, Message, TextChannel, User, VoiceChannel, VoiceClient, VoiceState
+from discord import Guild, Member, Message, TextChannel, VoiceChannel, VoiceClient, VoiceState
 from discord.ext import commands, tasks
 from discord.ext.commands import Bot, Context
 
@@ -171,7 +171,6 @@ class MusicPlayerView(discord.ui.View):
 async def update_player(ctx: Context[Bot], song_title=None, is_playing: bool = False) -> None:
     if ctx.guild is None:
         return
-
     guild_id = ctx.guild.id
 
     # Track this channel as having a player
