@@ -859,7 +859,7 @@ async def on_voice_state_update(member: Member, before: VoiceState, after: Voice
     # First handle the bot's own disconnects
     if member.id == bot.user.id:
         if before.channel is not None and after.channel is None:
-            on_bot_voice_disconnect(before.channel.guild.id)
+            await on_bot_voice_disconnect(before.channel.guild.id)
         # handling for voice connection errors
         if hasattr(after, "channel") and after.channel is not None:
             if hasattr(after, "self_deaf") and after.self_deaf is True:
