@@ -9,6 +9,7 @@ import asyncio
 import json
 from pathlib import Path
 import random
+import re
 import time
 from typing import Any
 
@@ -242,7 +243,7 @@ async def update_player(ctx: Context[Bot], song_title=None, is_playing: bool = F
 
 
 # Add this helper function to clean up previous player messages
-async def cleanup_previous_player_messages(ctx) -> None:
+async def cleanup_previous_player_messages(ctx: Context[Bot]) -> None:
     """Find and delete old player messages from the bot in the current channel"""
     try:
         # Get recent messages in the channel
@@ -271,7 +272,7 @@ async def cleanup_previous_player_messages(ctx) -> None:
 
 
 # Function to play the next song in the queue
-async def play_next(ctx) -> None:
+async def play_next(ctx: Context[Bot]) -> None:
     if len(queue) > 0:
         query = queue[0]
         try:
@@ -395,7 +396,7 @@ async def goon(ctx: Context[Bot], *, query: str) -> None:
 
 
 @goon.command(name="info", help="Shows information about the bot")
-async def info(ctx) -> None:
+async def info(ctx: Context[Bot]) -> None:
     await ctx.send(f"Build date: {BUILD_DATE}")
 
 
@@ -526,7 +527,7 @@ async def get_queue_display() -> str:
 
 # Command: !goon queue
 @goon.command(name="queue", help="Displays the current queue")
-async def show_queue(ctx) -> None:
+async def show_queue(ctx: Context[Bot]) -> None:
     queue_display = await get_queue_display()
     # Using ephemeral=True to make it visible only to the user
     await ctx.send(queue_display, ephemeral=True)
@@ -534,7 +535,7 @@ async def show_queue(ctx) -> None:
 
 # Command: !goon skip
 @goon.command(name="skip", help="Skips the current song")
-async def skip(ctx) -> None:
+async def skip(ctx: Context[Bot]) -> None:
     voice_client = ctx.message.guild.voice_client
     if voice_client.is_playing():
         voice_client.stop()
@@ -545,7 +546,7 @@ async def skip(ctx) -> None:
 
 # Command: !goon leave
 @goon.command(name="leave", help="Leaves the voice channel")
-async def leave(ctx) -> None:
+async def leave(ctx: Context[Bot]) -> None:
     voice_client = ctx.message.guild.voice_client
     if voice_client and voice_client.is_connected:
         # Clear the player message before leaving
@@ -569,7 +570,7 @@ async def leave(ctx) -> None:
 
 # Command: !goon pause
 @goon.command(name="pause", help="Pauses the current song")
-async def pause(ctx) -> None:
+async def pause(ctx: Context[Bot]) -> None:
     voice_client = ctx.message.guild.voice_client
     if voice_client.is_playing():
         voice_client.pause()
@@ -579,7 +580,7 @@ async def pause(ctx) -> None:
 
 # Command: !goon resume
 @goon.command(name="resume", help="Resumes the paused song")
-async def resume(ctx) -> None:
+async def resume(ctx: Context[Bot]) -> None:
     voice_client = ctx.message.guild.voice_client
     if voice_client.is_paused():
         voice_client.resume()
@@ -589,7 +590,7 @@ async def resume(ctx) -> None:
 
 # Command: !goon stop
 @goon.command(name="stop", help="Stops the current song")
-async def stop(ctx) -> None:
+async def stop(ctx: Context[Bot]) -> None:
     voice_client = ctx.message.guild.voice_client
     if voice_client.is_playing():
         voice_client.stop()
@@ -599,7 +600,7 @@ async def stop(ctx) -> None:
 
 
 @goon.command(name="help", help="Displays the help message")
-async def bot_help(ctx) -> None:
+async def bot_help(ctx: Context[Bot]) -> None:
     await ctx.send(
         "GoonBot is a music bot that can play songs from YouTube. Usage:\n"
         "1. `!goon <query>`: Plays the song with the given query.\n"
@@ -617,7 +618,7 @@ async def bot_help(ctx) -> None:
 
 # Command: !goon shuffle
 @goon.command(name="shuffle", help="Shuffles the songs in the queue")
-async def shuffle(ctx) -> None:
+async def shuffle(ctx: Context[Bot]) -> None:
     if len(queue) <= 1:
         await ctx.send("Need at least 2 songs in the queue to shuffle.")
         return
@@ -647,8 +648,6 @@ async def playlist(ctx: Context[Bot], *, query: str) -> None:
         url = playlists[query]
     else:
         # Extract playlist ID and convert to proper playlist URL
-        import re
-
         # Check if this is a YouTube URL with a video and playlist ID
         playlist_id_match = re.search(r"list=([^&]+)", query)
         if playlist_id_match and ("youtube.com/watch" in query or "youtu.be" in query):
