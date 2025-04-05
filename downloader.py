@@ -55,7 +55,7 @@ playlist_ytdl = yt_dlp.YoutubeDL(playlist_ytdl_options)
 class YTDLSource(PCMVolumeTransformer):
     """Improved YouTube DL extractor with retry mechanism"""
 
-    def __init__(self, source: AudioSource, *, data: dict[str, Any] = {}, volume: float = 0.5) -> None:
+    def __init__(self, source: AudioSource, *, data: dict[str, Any], volume: float = 0.5) -> None:
         super().__init__(source, volume)
         self.data: dict[str, Any] = data
         self.title: str = data.get("title", "Unknown title")
