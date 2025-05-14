@@ -751,6 +751,30 @@ async def playlist(ctx: Context[Bot], *, query: str) -> None:
 
     await processing_msg.delete(delay=5)
 
+@goon.command(name="hh", help="Plays the local hh.mp3 file")
+async def play_hh(ctx: Context[Bot]) -> None:
+    """Plays the local hh.mp3 file in the user's voice channel."""
+    if await connect_to_channel(ctx) is None:
+        return
+
+    if not isinstance(ctx.voice_client, VoiceClient):
+        await ctx.send("Could not connect to a voice channel.", delete_after=5)
+        return
+
+    # Stop any current playback
+    if ctx.voice_client.is_playing():
+        ctx.voice_client.stop()
+
+    # Path to your mp3 file
+    mp3_path = "hh.mp3"
+
+    # Play the mp3 file
+    try:
+        source = discord.FFmpegPCMAudio(mp3_path)
+        ctx.voice_client.play(source)
+        await ctx.send("▶️ Playing hh.mp3", delete_after=5)
+    except Exception as e:
+        await ctx.send(f"❌ Error playing hh.mp3: {e}", delete_after=5)
 
 @goon.command(name="setprefix", help="Allows to change the prefix of the bot in the guild")
 @commands.has_permissions(administrator=True)
