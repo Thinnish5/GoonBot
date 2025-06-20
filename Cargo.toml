@@ -1,0 +1,23 @@
+[package]
+name = "goonbot"
+version = "0.1.0"
+edition = "2025"
+
+[dependencies]
+# Discord bot framework
+serenity = { version = "0.12", features = ["framework", "standard_framework", "client", "gateway", "rustls_backend"] }
+
+# Voice support
+songbird = "0.4"
+
+# Async runtime
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "process"] }
+
+# Error handling
+anyhow = "1"
+
+# Thread-safe map for queues
+dashmap = "5"
+
+# For static initialization of the queue map
+once_cell = "1"
