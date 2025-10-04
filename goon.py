@@ -56,6 +56,7 @@ async def get_prefix(bot_arg: Bot, message: discord.Message):
 # Bot setup
 intents = discord.Intents.default()
 intents.message_content = True
+intents.voice_states = True  # Required for voice connections
 bot = commands.Bot(command_prefix=get_prefix, intents=intents)
 
 # Queue system
@@ -381,7 +382,9 @@ async def goon(ctx: Context[Bot], *, query: str | None) -> None:
             await temp_msg.edit(content=f"✅ Added to queue: `{result['title']}`")
 
         except Exception as e:
+            import traceback
             print(f"Search error: {e}")
+            print(traceback.format_exc())
             await temp_msg.edit(content=f"❌ Error searching YouTube: {str(e)[:100]}...")
             return
 
@@ -496,12 +499,36 @@ async def connect_to_channel(ctx: Context[Bot]) -> Context[Bot] | None:
         await ctx.send(f"{ctx.message.author.name} is not connected to a voice channel", delete_after=5)
         return None
 
-    if ctx.voice_client is None or not isinstance(ctx.voice_client, VoiceClient) or not ctx.voice_client.is_connected():
-        channel = ctx.message.author.voice.channel
-        if channel is None:
-            await ctx.send(f"Could not find {ctx.message.author.name} voice channel", delete_after=5)
-            return None
-        await channel.connect()
+    channel = ctx.message.author.voice.channel
+    if channel is None:
+        await ctx.send(f"Could not find {ctx.message.author.name} voice channel", delete_after=5)
+        return None
+
+    # If already connected to the correct channel, just return
+    if isinstance(ctx.voice_client, VoiceClient) and ctx.voice_client.is_connected():
+        if ctx.voice_client.channel and ctx.voice_client.channel.id == channel.id:
+            return ctx
+        # Connected to wrong channel, move to the new one
+        await ctx.voice_client.move_to(channel)
+        return ctx
+
+    # Clean up any existing voice client before connecting
+    if ctx.voice_client is not None:
+        try:
+            await ctx.voice_client.disconnect(force=True)
+            await asyncio.sleep(0.5)  # Give Discord time to clean up the session
+        except Exception as e:
+            print(f"Error during cleanup: {e}")
+
+    # Now connect fresh
+    try:
+        await channel.connect(timeout=30.0, reconnect=True, self_deaf=True)
+        await asyncio.sleep(0.3)  # Small delay to let connection stabilize
+    except Exception as e:
+        print(f"Failed to connect to voice channel: {e}")
+        await ctx.send(f"Could not connect to voice channel: {str(e)}", delete_after=10)
+        return None
+    
     return ctx
 
 

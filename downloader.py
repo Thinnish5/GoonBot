@@ -45,7 +45,7 @@ playlist_ytdl_options.update(
 )
 
 # Suppress noise about console usage from youtube_dl
-yt_dlp.utils.bug_reports_message = lambda: ""
+yt_dlp.utils.bug_reports_message = lambda **kwargs: ""
 
 ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 
@@ -79,7 +79,7 @@ class YTDLSource(PCMVolumeTransformer):
                 ytdl_instance = yt_dlp.YoutubeDL(ytdl_format_options)
 
                 # Extract info
-                result = await loop.run_in_executor(executor=None, func=lambda: ytdl_instance.extract_info(url=url, download=not stream))
+                result = await loop.run_in_executor(None, lambda: ytdl_instance.extract_info(url, download=not stream))
                 if result is None:
                     data = {}
                 elif isinstance(result, dict):
@@ -92,7 +92,7 @@ class YTDLSource(PCMVolumeTransformer):
                     data = data["entries"][0]
 
                 filename = data["url"] if stream else ytdl_instance.prepare_filename(data)
-                return cls(FFmpegPCMAudio(source=filename, before_options=FFMPEG_BEFORE_OPTIONS, options=FFMPEG_OPTIONS), data=data)
+                return cls(FFmpegPCMAudio(filename, before_options=FFMPEG_BEFORE_OPTIONS, options=FFMPEG_OPTIONS), data=data)
 
             except Exception as e:
                 print(f"Stream extraction attempt {attempt + 1} failed: {e}")
