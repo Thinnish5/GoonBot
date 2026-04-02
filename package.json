@@ -1,0 +1,32 @@
+{
+  "name": "discord-music-bot",
+  "version": "1.0.0",
+  "description": "Feature-rich Discord music bot with YouTube support",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "watch": "tsc --watch"
+  },
+  "keywords": [
+    "discord",
+    "music",
+    "bot",
+    "youtube"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "*",
+    "@discordjs/voice": "*",
+    "@discordjs/opus": "*",
+    "libsodium-wrappers": "*",
+    "dotenv": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "typescript": "^5.3.3",
+    "ts-node": "^10.9.2"
+  }
+}

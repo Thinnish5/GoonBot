@@ -1,70 +1,194 @@
-# GoonBot
+# Discord Music Bot - TypeScript
 
-GoonBot is a Discord music bot that allows users to play music from YouTube directly in their voice channels. It supports commands for joining, leaving, playing, pausing, resuming, stopping, and skipping songs.
-
+A feature-rich Discord music bot built with TypeScript and Discord.js that plays music from YouTube URLs.
 
 ## Features
 
-- **Play Music**: Play music from YouTube using `!goon <query>` - works with both URLs and search terms
-- **Search & Queue**: Search for songs with `!goon search <query>` and select from top 5 results
-- **Queue Management**: View the current queue with `!goon queue`
-- **Playlist Support**: Play entire YouTube playlists with `!goon playlist <name or link>`
-- **Controls**: Skip, pause, resume, and stop playback with intuitive commands and buttons
-- **Auto-Disconnect**: Bot automatically leaves when everyone else leaves the voice channel
-- **Shuffle**: Randomize your queue with `!goon shuffle`
-- **Progress Bar**: Visual progress tracking for currently playing songs
-- **High-Quality Audio**: Uses FFmpeg for high-quality audio streaming
-- **Audio Normalization**: Ensures consistent volume levels across tracks
-
+- ✅ Play music from YouTube URLs
+- ✅ Queue management (add, skip, view queue)
+- ✅ Pause/Resume functionality
+- ✅ Stop and clear queue
+- ✅ Auto-disconnect when alone in voice channel
+- ✅ Beautiful embeds for song information
+- ✅ Fully typed with TypeScript
 
 ## Prerequisites
 
-- Python (with pip) 3.11 or higher (3.13 is recomended)
-- virtualenv (`python -m pip install virtualenv`)
-- FFmpeg installed on your system (https://ffmpeg.org/download.html)
-- A Discord bot token from the [Discord Developer Portal](https://discord.com/developers/applications).
+- Node.js 16.9.0 or higher
+- npm or yarn
+- Discord bot token
+- ffmpeg (for audio processing)
 
+### Install ffmpeg
 
-## Running Locally
-
-### Linux/macOs venv setup
-
-Create the `secret.secret` file with your bot token.
-
-```shell
-# virtual environment to isolate the dependencies
-virtualenv .venv
-source .venv/bin/activate
-
-# install bot dependencies
-pip install -r requirements.txt
-
-# launch the bot locally
-python goon.py
+**macOS:**
+```bash
+brew install ffmpeg
 ```
 
-## Git Hooks
-
-To configure the git hooks run:
-```shell
-git config --local core.hooksPath .githooks
+**Ubuntu/Debian:**
+```bash
+sudo apt-get install ffmpeg
 ```
 
-## References
+**Windows:**
+Download from [ffmpeg.org](https://ffmpeg.org/download.html)
 
-### APIs & Libraries
-- [Discord.py Documentation](https://discordpy.readthedocs.io/en/stable/)
-- [YouTube Data API](https://developers.google.com/youtube/v3)
-- [yt-dlp Documentation](https://github.com/yt-dlp/yt-dlp#readme)
-- [FFmpeg Documentation](https://ffmpeg.org/documentation.html)
-- [PyNaCl](https://pynacl.readthedocs.io/en/latest/)
+## Setup
 
-### Helpful Resources
-- [Discord Developer Portal](https://discord.com/developers/docs/intro)
-- [Discord Bot Best Practices](https://discord.com/developers/docs/topics/community-resources#bots)
-- [YouTube Terms of Service](https://www.youtube.com/t/terms)
-- [Discord.py Voice Examples](https://github.com/Rapptz/discord.py/blob/master/examples/basic_voice.py)
+### 1. Clone or setup the project
 
+```bash
+cd /Users/diogo/Projetos/goonbot
+```
+
+### 2. Install dependencies
+
+```bash
+npm install
+```
+
+### 3. Create Discord Bot
+
+1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
+2. Click "New Application"
+3. Go to "Bot" tab and click "Add Bot"
+4. Copy your bot token
+5. Under "OAuth2 > URL Generator", select:
+   - Scopes: `bot`
+   - Permissions: `Send Messages`, `Use Slash Commands`, `Connect`, `Speak`
+6. Copy the generated URL and open it to invite bot to your server
+
+### 4. Configure environment
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your values:
+
+```env
+DISCORD_TOKEN=your_bot_token_here
+CLIENT_ID=your_client_id_here
+GUILD_ID=your_guild_id_here  # Optional: for testing, commands register faster
+```
+
+Find your IDs:
+- `CLIENT_ID`: In Developer Portal > General Information
+- `GUILD_ID`: Enable Developer Mode in Discord (User Settings > Advanced > Developer Mode), right-click server, copy ID
+
+### 5. Build and run
+
+**Development:**
+```bash
+npm run dev
+```
+
+**Production:**
+```bash
+npm run build
+npm start
+```
+
+**Watch mode:**
+```bash
+npm run watch
+```
+
+## Commands
+
+### `/play <url>`
+Add a YouTube song to the queue and start playing
+
+```
+/play https://www.youtube.com/watch?v=dQw4w9WgXcQ
+```
+
+### `/queue`
+View current queue and now playing song
+
+### `/skip`
+Skip the currently playing song
+
+### `/pause`
+Pause the current song
+
+### `/resume`
+Resume the paused song
+
+### `/stop`
+Stop playing and clear the queue
+
+## Project Structure
+
+```
+goonbot/
+├── src/
+│   ├── index.ts           # Main bot file
+│   ├── commands/          # Slash command handlers
+│   │   ├── play.ts
+│   │   ├── queue.ts
+│   │   ├── skip.ts
+│   │   ├── pause.ts
+│   │   ├── resume.ts
+│   │   └── stop.ts
+│   ├── utils/             # Utility modules
+│   │   ├── musicPlayer.ts # Audio playback
+│   │   ├── queueManager.ts # Queue management
+│   │   └── youtubeUtil.ts # YouTube helpers
+│   └── types/             # TypeScript interfaces
+│       └── index.ts
+├── dist/                  # Compiled JavaScript
+├── package.json
+├── tsconfig.json
+└── .env
+```
+
+## How It Works
+
+1. **Queue System**: Each guild has its own queue managed by `QueueManager`
+2. **Music Player**: `MusicPlayer` handles audio playback via Discord.js voice
+3. **YouTube Integration**: `YouTubeUtil` fetches video info and streams audio
+4. **Commands**: Slash commands handle user interactions
+5. **Auto-Skip**: When a song finishes, the next song plays automatically
+
+## Troubleshooting
+
+### Bot doesn't respond to commands
+- Check if bot has "Use Slash Commands" permission in the channel
+- Ensure `DISCORD_TOKEN` and `CLIENT_ID` are correct
+- Verify bot is in the Discord server
+
+### No audio playing
+- Ensure ffmpeg is installed: `ffmpeg -version`
+- Check if bot has "Connect" and "Speak" permissions
+- Verify you're in a voice channel before using `/play`
+
+### YouTube URL not working
+- Make sure the URL is valid and the video is accessible
+- Bot cannot play age-restricted or private videos
+- Check console for error messages
+
+## Performance Tips
+
+- The bot can handle multiple servers simultaneously
+- Each guild has its own queue and music player instance
+- Audio is streamed directly from YouTube (no local caching)
+
+## Dependencies
+
+- **discord.js**: Discord API wrapper
+- **@discordjs/voice**: Voice channel support
+- **ytdl-core**: YouTube audio streaming
+- **typescript**: Type safety
+- **dotenv**: Environment configuration
 
 ## License
-This project is licensed under the MIT License. See the [LICENSE](https://github.com/Thinnish5/goonbot/blob/main/LICENSE) file for details.
+
+MIT
+
+## Notes
+
+- This bot uses ytdl-core for YouTube streaming
+- Ensure you comply with YouTube's Terms of Service
+- The bot auto-disconnects when the last human leaves the channel
