@@ -39,6 +39,8 @@ export class MusicPlayer {
       'bestaudio',
       '-g',
       '--no-playlist',
+      '--extractor-args',
+      'youtube:player_client=web_creator',
       url,
     ]);
 

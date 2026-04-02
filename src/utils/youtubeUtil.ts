@@ -20,6 +20,8 @@ export class YouTubeUtil {
       const { stdout } = await execFileAsync('yt-dlp', [
         '--dump-single-json',
         '--no-playlist',
+        '--extractor-args',
+        'youtube:player_client=web_creator',
         url,
       ]);
 
