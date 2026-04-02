@@ -21,7 +21,7 @@ export class YouTubeUtil {
         '--dump-single-json',
         '--no-playlist',
         '--extractor-args',
-        'youtube:player_client=web_creator',
+        'youtube:player_client=tv_embedded',
         url,
       ]);
 

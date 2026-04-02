@@ -40,7 +40,7 @@ export class MusicPlayer {
       '-g',
       '--no-playlist',
       '--extractor-args',
-      'youtube:player_client=web_creator',
+      'youtube:player_client=tv_embedded',
       url,
     ]);
 
