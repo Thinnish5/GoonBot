@@ -64,6 +64,7 @@ export class QueueManager {
     queue.songs = [];
     queue.currentSong = undefined;
     queue.playing = false;
+    queue.voiceConnection = undefined;
   }
 
   setPlaying(guildId: string, playing: boolean): void {

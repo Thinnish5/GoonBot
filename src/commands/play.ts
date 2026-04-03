@@ -131,7 +131,7 @@ async function startPlayback(
     const queue = queueManager.getQueue(interaction.guildId!);
     let connection = queue.voiceConnection;
 
-    if (!connection) {
+    if (!connection || connection.state.status === VoiceConnectionStatus.Destroyed) {
       connection = joinVoiceChannel({
         channelId: channel.id,
         guildId: interaction.guildId!,
