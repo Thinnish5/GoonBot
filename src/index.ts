@@ -298,6 +298,10 @@ client.once('clientReady', async () => {
 
   try {
     if (GUILD_ID) {
+      // Clear global commands just in case they were registered previously and are causing duplicates
+      await rest.put(Routes.applicationCommands(CLIENT_ID!), { body: [] });
+      console.log('🧹 Cleared old global commands');
+
       // Register to specific guild (faster for testing)
       await rest.put(Routes.applicationGuildCommands(CLIENT_ID!, GUILD_ID), {
         body: commandsData,
